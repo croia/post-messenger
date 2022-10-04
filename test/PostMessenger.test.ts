@@ -583,23 +583,23 @@ describe('PostMessenger', () => {
       }).toThrow(/.*reserved message type.*/gi);
     });
 
-    // test('should bind responder and be called when corresponding message is recieved', async () => {
-    //   const mockResponder = jest.fn();
-    //   const windowRef = await beginListeningWithMock(postMessenger);
-    //   postMessenger.bindResponders({ [MessageKeys.one]: mockResponder });
-    //   const data = { resProp: true };
-    //   await sleep(0); /* move to bottom of stack since addListener is added async */
-    //   const messageEvent = buildMessageEvent({
-    //     data: {
-    //       data,
-    //       errorMessage: null,
-    //       isError: false,
-    //       messageId: '23423425',
-    //       type: MessageTypes.one,
-    //     },
-    //   });
-    //   windowRef.sendMessage(messageEvent);
-    //   expect(mockResponder).toHaveBeenCalledWith(data, messageEvent);
-    // });
+    test('should bind responder and be called when corresponding message is recieved', async () => {
+      const mockResponder = jest.fn();
+      const windowRef = await beginListeningWithMock(postMessenger);
+      postMessenger.bindResponders({ [MessageKeys.one]: mockResponder });
+      const data = { resProp: true };
+      await sleep(0); /* move to bottom of stack since addListener is added async */
+      const messageEvent = buildMessageEvent({
+        data: {
+          data,
+          errorMessage: null,
+          isError: false,
+          messageId: '23423425',
+          type: MessageTypes.one,
+        },
+      });
+      windowRef.sendMessage(messageEvent);
+      expect(mockResponder).toHaveBeenCalledWith(data, messageEvent);
+    });
   });
 });
