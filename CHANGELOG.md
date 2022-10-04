@@ -1,3 +1,10 @@
+# 1.0.0 (2022-10-04)
+
+
+### Features
+
+* first release ([#10](https://github.com/croia/post-messenger/issues/10)) ([963cd20](https://github.com/croia/post-messenger/commit/963cd202e8c23d4294753bb6969f1b1a40fe124f))
+
 ## [1.0.2](https://github.com/croia/post-messenger/compare/v1.0.1...v1.0.2) (2022-10-03)
 
 

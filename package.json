@@ -1,6 +1,6 @@
 {
   "name": "@croia/post-messenger",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Client side module for connecting window objects and turning messages between them into promises",
   "main": "dist/index.js",
   "scripts": {
