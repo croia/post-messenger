@@ -17,5 +17,8 @@
     "@semantic-release/npm",
     "@semantic-release/changelog",
     "@semantic-release/git"
+  ],
+  "publish": [
+    "@semantic-release/github"
   ]
 }
