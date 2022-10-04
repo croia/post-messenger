@@ -3,6 +3,15 @@
 
 ### Bug Fixes
 
+* order of prepare step ([cd6eaf6](https://github.com/croia/post-messenger/commit/cd6eaf63f6271a8d9f3321d668c349953719aa07))
+* try defaults for all plugins ([#12](https://github.com/croia/post-messenger/issues/12)) ([956d101](https://github.com/croia/post-messenger/commit/956d101d43f6458839404d8d7432866b1e14b05d))
+* try reordering verifyConditions step ([#14](https://github.com/croia/post-messenger/issues/14)) ([212f317](https://github.com/croia/post-messenger/commit/212f317ff36df761c1d5109888e7f970f831cc51))
+
+## [1.0.2](https://github.com/croia/post-messenger/compare/v1.0.1...v1.0.2) (2022-10-04)
+
+
+### Bug Fixes
+
 * try defaults for all plugins ([#12](https://github.com/croia/post-messenger/issues/12)) ([956d101](https://github.com/croia/post-messenger/commit/956d101d43f6458839404d8d7432866b1e14b05d))
 * try reordering verifyConditions step ([#14](https://github.com/croia/post-messenger/issues/14)) ([212f317](https://github.com/croia/post-messenger/commit/212f317ff36df761c1d5109888e7f970f831cc51))
 
