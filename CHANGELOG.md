@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/croia/post-messenger/compare/v1.0.0...v1.0.1) (2022-10-04)
+
+
+### Bug Fixes
+
+* try creating github release ([#11](https://github.com/croia/post-messenger/issues/11)) ([d1bfa01](https://github.com/croia/post-messenger/commit/d1bfa012f1217c99ee6e614203f37cc9593e2a00))
+
 # 1.0.0 (2022-10-04)
 
 
