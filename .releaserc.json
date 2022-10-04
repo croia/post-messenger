@@ -15,5 +15,10 @@
     "@semantic-release/github",
     "@semantic-release/changelog",
     "@semantic-release/git"
+  ],
+  "prepare": [
+    "@semantic-release/npm",
+    "@semantic-release/changelog",
+    "@semantic-release/git"
   ]
 }
