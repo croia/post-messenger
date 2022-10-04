@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "*",
+    "**/*",
+    /* these files are not typescript but necessary to include in the dependency tree to make tslint parser happy: */
+    ".eslintrc.js",
+  ],
+  "exclude": [
+    "node_modules",
+    "dist/**/*",
+  ],
+}
