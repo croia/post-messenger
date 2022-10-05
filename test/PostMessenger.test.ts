@@ -583,8 +583,10 @@ describe('PostMessenger', () => {
       }).toThrow(/.*reserved message type.*/gi);
     });
 
-    test('should bind responder and be called when corresponding message is recieved', async () => {
+    test.only('should bind responder and be called when corresponding message is recieved', async () => {
       const mockResponder = jest.fn();
+      const iframeWindow = appendIFrameAndGetWindow();
+      postMessenger.setTarget(iframeWindow, targetOrigin);
       const windowRef = await beginListeningWithMock(postMessenger);
       postMessenger.bindResponders({ [MessageKeys.one]: mockResponder });
       const data = { resProp: true };
