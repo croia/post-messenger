@@ -592,7 +592,6 @@ describe('PostMessenger', () => {
       const windowRef = await beginListeningWithMock(postMessenger);
       postMessenger.bindResponders({ [MessageKeys.one]: mockResponder });
       const data = { resProp: true };
-      await sleep(0); // move to bottom of stack since addListener from beginListening above is added async
       const messageEvent = buildMessageEvent({
         data: {
           data,
