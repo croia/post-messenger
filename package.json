@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "auto-bind": "^5.0.1",
-    "uuid": "^8.3.2"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@babel/preset-env": "7.19.3",
