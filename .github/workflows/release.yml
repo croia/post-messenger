@@ -17,9 +17,10 @@ jobs:
           node-version: "16.x"
           cache: npm
       - run: npm ci
-      # - run: npm test
-      # - run: npm run build
+      - run: npm test
       - run: npx semantic-release
+        # build happens automatically in the package.json postversion script when
+        # semantic release increments the version see https://bit.ly/3yllLkR
         env:
           GITHUB_TOKEN: ${{ secrets.CROIABOT_PAT }}
           NPM_TOKEN: ${{ secrets.CROIABOT_PAT }}
