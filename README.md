@@ -1,14 +1,19 @@
 # PostMessenger
 
 ## Description
-window.postMessage is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger can connect window objects and wrap postMessage messages in promises to make communication easier to manage.
+`window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger can connect window objects and wrap `window.postMessage` messages in promises to make communication between windows easier to manage.
  
-## Encryption
-For cases in which other potentially untrusted scripts are running on the same domain, encryption can be used to prevent those scripts from reading messages. For example if you're building an extension that needs to communicate from the root page to a trusted iframe you may not have control over all the scripts loaded by the root page. These scripts could intercept messages coming back from the trusted iframe to the root page domain. If this is a concern for your app you can set `useEncryption: true` to dynamically generate an encryption key that is passed to the secondary trusted domain so it is known only to your script and the trusted domain.
+## Message encryption
+For cases in which other potentially untrusted scripts are running on the same domain, encryption can be used to prevent those scripts from reading messages. For example if you're building an extension that needs to communicate from the root page to a trusted iframe you may not have control over all the scripts loaded by the root page. These scripts could intercept messages coming back from the trusted iframe to the root page domain. By default PostMessenger will generate an encryption key that is passed to the secondary trusted domain so it is known only to your script and the trusted domain. If this is not a concern for your app you can set `useEncryption: false`
+
+## acceptConnections
+
+By default a specific root page `origin` must be provided `allowAnyOrigin` is `false` by default. If for some reason it's not possible to know in advance the domain of the root page that is sending the connection request you can pass `allowAnyOrigin: true` but be aware that any page could simulate a connection request to your app. You must take extra care in this case not to expose sensitive information or else ensure your app is only able to perform sensitive tasks using an API access key provided by the root page domain that a malicious third party wouldn't have.
 
 ## Example Usage
 ```javascript
-import { PostMessenger } from '@coreymartin/post-messenger';
+// Usage from the root page:
+import { PostMessenger } from '@croia/post-messenger';
 
 const types = { init: 'init' };
 
@@ -16,10 +21,9 @@ const postMessenger = new PostMessenger({
   types,
   enableLogging: __DEVELOPMENT__,
   // name to help distinguish window objects, used by logger:
-  clientName: 'iframe-app',
+  clientName: 'some-app',
   useEncryption: false,
 });
-
 
 // set the target iframe and url to post messages to with .request
 postMessenger.setTarget(window.parent, parentOriginUrl);
