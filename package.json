@@ -1,6 +1,6 @@
 {
   "name": "@croia/post-messenger",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Client side module for connecting window objects and turning messages between them into promises",
   "main": "dist/index.js",
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "auto-bind": "^5.0.1",
-    "uuid": "^8.3.2"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@babel/preset-env": "7.19.3",

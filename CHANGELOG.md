@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/croia/post-messenger/compare/v1.0.2...v1.0.3) (2022-10-05)
+
+
+### Bug Fixes
+
+* **deps:** update dependency uuid to v9 ([#9](https://github.com/croia/post-messenger/issues/9)) ([07fc66a](https://github.com/croia/post-messenger/commit/07fc66a42db84c50ea4bc0f6244a727baf83dccc))
+
 ## [1.0.2](https://github.com/croia/post-messenger/compare/v1.0.1...v1.0.2) (2022-10-04)
 
 
