@@ -1,7 +1,84 @@
 # PostMessenger
 
-## Description
-`window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger can connect window objects and wrap `window.postMessage` messages in promises to make communication between windows easier to manage.
+`window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
+
+## Example Usage
+
+Since this library is just a wrapper for `window.postMessage`, PostMessenger should work between any two windows objects that `window.postMessage` supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts on both windows:
+
+```javascript
+// From the root page window:
+import { PostMessenger } from '@croia/post-messenger';
+
+const iframeSrc = 'https://some.app';
+const iframe = document.createElement('iframe');
+iframe.src = iframeSrc;
+document.body.appendChild(iframe);
+
+const postMessenger = new PostMessenger({
+  // Declare the request types that the other window will expect to receive. In general request types
+  // should be the exact same in both windows. PostMessenger will throw an error if you make a request
+  // type that the connected window did not declare in their PostMessenger instance.
+  types: {
+    // These are just some example request types, call yours whatever you'd like.
+    initializeSomeApp: 'mainApp:initializeTheApp',
+    requestSomeDataFromTheApp: 'mainApp:requestSomeDataFromTheApp'
+  },
+  enableLogging: true,
+  // Provide a name to help you distinguish either window object in the logs output in the console (if enabled above):
+  clientName: 'parent-client',
+  // Encryption is enabled by default but you may set it to `false` if you'd like (see notes in Message Encryption section below)
+  useEncryption: false,
+});
+
+// Add functions to run when you receive a request from the iframe. Return values are sent back to the iframe and must be JSON serializable:
+postMessenger.bindResponders({
+  requestSomeDataFromTheApp: ({ someParam }) => {
+    return someParam + 1;
+  }
+});
+
+// Wait for connection from the iframe:
+await postMessenger.acceptConnections({ origin: iframeSrc });
+
+const response = await postMessenger.request(postMessenger.types.initializeSomeApp, {
+  // include any data you want but it will need to be JSON serializable:
+  someMessage: '1234',
+});
+
+console.log({ response });
+
+// From the iframe:
+import { PostMessenger } from '@croia/post-messenger';
+
+const postMessenger = new PostMessenger({
+  types: {
+    initializeSomeApp: 'mainApp:initializeTheApp',
+    requestSomeDataFromTheApp: 'mainApp:requestSomeDataFromTheApp'
+  },
+  enableLogging: true,
+  clientName: 'child-client',
+  useEncryption: false,
+});
+
+postMessenger.bindResponders({
+  initializeSomeApp: ({ someMessage }) => {
+    console.log({ someMessage });
+    return true;
+  }
+});
+
+// Initialize connection with the root window. PostMessenger will automatically retry 10 times which will help fix any race conditions if acceptConnections has not been set up yet in the root window. If you need to change this for some reason specify maxRetries option in connect:
+await postMessenger.connect({
+  targetOrigin: iframeSrc,
+  targetWindow: iframe.contentWindow,
+  // maxRetries: 20
+});
+
+const response = await postMessenger.request(postMessenger.types.requestSomeDataFromTheApp, 3);
+
+console.log({ response }); // { response: 4 }
+```
 
 ## Security
 
@@ -13,40 +90,6 @@ Messages are encrypted by default which is useful when other potentially untrust
 ## acceptConnections
 
 By default a specific root page `origin` must be provided `allowAnyOrigin` is `false` by default. If for some reason it's not possible to know in advance the domain of the root page that is sending the connection request you can pass `allowAnyOrigin: true` but be aware that any page could simulate a connection request to your app. You must take extra care in this case not to expose sensitive information or else ensure your app is only able to perform sensitive tasks using an API access key provided by the root page domain that a malicious third party wouldn't have.
-
-## Example Usage
-```javascript
-// Usage from the root page:
-import { PostMessenger } from '@croia/post-messenger';
-
-const types = { init: 'init' };
-
-const postMessenger = new PostMessenger({
-  types,
-  enableLogging: __DEVELOPMENT__,
-  // name to help distinguish window objects, used by logger:
-  clientName: 'some-app',
-  useEncryption: false,
-});
-
-// set the target iframe and url to post messages to with .request
-postMessenger.setTarget(window.parent, parentOriginUrl);
-
-// add responders, functions to run when a request of a certain type is received
-postMessenger.bindResponders({
-  [postMessenger.types.openApp]: (data) => {
-    openApp();
-    // return values are serialized and passed back to window that made the request
-    return true;
-  },
-});
-
-// begin listening and accept all messages
-postMessenger.beginListening(() => true, __DEVELOPMENT__);
-
-// send the request from the base page
-postMessenger.request(postMessenger.types.openApp, { options });
-```
 
 ## API Documentation
 
@@ -118,4 +161,3 @@ The types of available messages to send to other frames.
 
 ## Deployment
 - TODO
-
