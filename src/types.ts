@@ -25,7 +25,7 @@ export type Responders<T> = {
 
 export type RequestMessage<T> = {
   type: string;
-  messageId: string;
+  requestId: string;
   data: T;
   isError: boolean;
   errorMessage: string | null;
@@ -36,7 +36,7 @@ export const isRequestMessage = <T>(msg: RequestMessage<T>): msg is RequestMessa
   typeof msg === 'object' &&
   !Array.isArray(msg) &&
   typeof msg.type === 'string' &&
-  typeof msg.messageId === 'string' &&
+  typeof msg.requestId === 'string' &&
   typeof msg.isError === 'boolean' &&
   typeof msg.errorMessage !== 'undefined',
 );
@@ -46,7 +46,7 @@ export type PostMessengerArgs<T> = {
   enableLogging?: boolean;
   useEncryption?: boolean;
   maxResponseTime?: number;
-  types: T;
+  requestNames: T;
 };
 
 export type ConnectMessage = {
@@ -54,7 +54,7 @@ export type ConnectMessage = {
   iv?: Uint8Array;
   jsonRequestKey?: JsonWebKey;
   requestKey;
-  types: Record<string, string>;
+  requestNames: Record<string, string>;
   clientName: string;
   origin: string;
 };
@@ -83,10 +83,10 @@ export type AcceptConnectionsArgs = {
 export type ConnectionDetails = {
   useEncryption: boolean;
   clientName: string;
-  types: Record<string, string>;
+  requestNames: Record<string, string>;
 };
 
-export enum InternalMessageTypes {
+export enum InternalRequestNames {
   postMessengerConnect = 'post-messenger-connect',
 }
 

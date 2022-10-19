@@ -1,7 +1,7 @@
 import { buildMessageEvent } from './factories';
 import { crypto, exportedKey, TextDecoder, textDecoderResponse, TextEncoder } from './mocks';
 import { PostMessenger } from '../src/index';
-import { ConnectionDetails, InternalMessageTypes } from '../src/types';
+import { ConnectionDetails, InternalRequestNames } from '../src/types';
 
 interface TestWindow extends Window {
   crypto: any;
@@ -19,10 +19,10 @@ export function buildMessageKeys<T extends string>(messages: Record<string, stri
   return messageKeys as { [K in T]: K; };
 }
 
-enum MessageTypes {
+enum RequestNames {
   one = 'test:one',
 }
-const MessageKeys = buildMessageKeys<keyof typeof MessageTypes>(MessageTypes);
+const MessageKeys = buildMessageKeys<keyof typeof RequestNames>(RequestNames);
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -61,7 +61,7 @@ function buildWindowRef(): WindowRef {
   return windowRef;
 }
 
-async function beginListeningWithMock(postMessengerInstance: PostMessenger<typeof MessageTypes>): Promise<WindowRef> {
+async function beginListeningWithMock(postMessengerInstance: PostMessenger<typeof RequestNames>): Promise<WindowRef> {
   return new Promise((resolve) => {
     const windowRef = buildWindowRef();
     postMessengerInstance.beginListening(() => true);
@@ -70,7 +70,7 @@ async function beginListeningWithMock(postMessengerInstance: PostMessenger<typeo
 }
 
 async function connectWithMock(
-  postMessengerInstance: PostMessenger<typeof MessageTypes>,
+  postMessengerInstance: PostMessenger<typeof RequestNames>,
   targetWindow: Window,
   targetOrigin: string,
   connectResponse: ConnectionDetails,
@@ -95,8 +95,8 @@ async function connectWithMock(
         data: connectResponse,
         errorMessage: null,
         isError: false,
-        messageId: message.messageId,
-        type: InternalMessageTypes.postMessengerConnect,
+        requestId: message.requestId,
+        requestName: InternalRequestNames.postMessengerConnect,
       },
       origin: targetOrigin,
     }));
@@ -124,22 +124,22 @@ describe('PostMessenger', () => {
     test('should construct PostMessenger properly and not expose private properties', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
       });
       expect(postMessenger.clientName).toEqual(clientName);
       expect(postMessenger.maxResponseTime).toBeDefined();
 
       expect(postMessenger['#listeners']).not.toBeDefined();
       expect(postMessenger['#encryptionValues']).not.toBeDefined();
-      expect(postMessenger['#types']).not.toBeDefined();
+      expect(postMessenger['#requestNames']).not.toBeDefined();
       expect(postMessenger['#enableLogging']).not.toBeDefined();
     });
 
-    test('should prevent reserved message types from being used', async () => {
+    test('should prevent reserved request names from being used', async () => {
       expect(() => {
         new PostMessenger({
           clientName,
-          types: { postMessengerConnect: 'post-messenger-connect' },
+          requestNames: { postMessengerConnect: 'post-messenger-connect' },
         });
       }).toThrow(/.*reserved.*message.*/gi);
     });
@@ -150,7 +150,7 @@ describe('PostMessenger', () => {
       const postMessenger = new PostMessenger({
         clientName,
         enableLogging: false,
-        types: MessageTypes,
+        requestNames: RequestNames,
       });
 
       const consoleLogMock = jest.spyOn(console, 'log');
@@ -167,7 +167,7 @@ describe('PostMessenger', () => {
       const postMessenger = new PostMessenger({
         clientName,
         enableLogging: true,
-        types: MessageTypes,
+        requestNames: RequestNames,
       });
 
       const consoleLogMock = jest.spyOn(console, 'log');
@@ -181,10 +181,10 @@ describe('PostMessenger', () => {
     test('should add and remove listeners successfully', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
       });
       const listener = () => {};
-      const removeListener = postMessenger.addListener(MessageTypes.one, listener);
+      const removeListener = postMessenger.addListener(RequestNames.one, listener);
       let listeners = postMessenger.getListeners();
       expect(Object.keys(listeners)).toHaveLength(1);
       expect(Object.values(listeners)[0]).toHaveLength(1);
@@ -201,10 +201,10 @@ describe('PostMessenger', () => {
       jest.clearAllMocks();
     });
 
-    test('should throw an error if messageKey does not exist on types', async () => {
+    test('should throw an error if messageKey does not exist on request names', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
       });
       expect(() => {
         // @ts-expect-error: test for non ts consumers
@@ -215,7 +215,7 @@ describe('PostMessenger', () => {
     test('should send request messages and respond to request messages properly after beginListening is called', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: false,
       });
 
@@ -230,8 +230,8 @@ describe('PostMessenger', () => {
             data: { resProp: true },
             errorMessage: null,
             isError: false,
-            messageId: message.messageId,
-            type: MessageTypes.one,
+            requestId: message.requestId,
+            requestName: RequestNames.one,
           },
           origin: targetOrigin,
         }));
@@ -243,7 +243,7 @@ describe('PostMessenger', () => {
     test('should throw if request returns a request message indicating an error occurred', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: false,
       });
 
@@ -259,8 +259,8 @@ describe('PostMessenger', () => {
             data: { resProp: true },
             errorMessage,
             isError: true,
-            messageId: message.messageId,
-            type: MessageTypes.one,
+            requestId: message.requestId,
+            requestName: RequestNames.one,
           },
         }));
       });
@@ -269,10 +269,10 @@ describe('PostMessenger', () => {
       }).rejects.toThrow(new RegExp(`.*${errorMessage}.*`, 'gi'));
     });
 
-    test('should not accept and timeout for a received request message with a non matching messageId', async () => {
+    test('should not accept and timeout for a received request message with a non matching requestId', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: false,
       });
 
@@ -287,8 +287,8 @@ describe('PostMessenger', () => {
             data: { resProp: true },
             errorMessage: null,
             isError: false,
-            messageId: 'the-wrong-message-id',
-            type: MessageTypes.one,
+            requestId: 'the-wrong-request-id',
+            requestName: RequestNames.one,
           },
         }));
       });
@@ -300,7 +300,7 @@ describe('PostMessenger', () => {
     test('should throw for non existing connection when encryption is true', async () => {
       const postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: true,
       });
 
@@ -314,19 +314,19 @@ describe('PostMessenger', () => {
   });
 
   describe('connect with encryption', () => {
-    let postMessenger: PostMessenger<typeof MessageTypes>;
+    let postMessenger: PostMessenger<typeof RequestNames>;
     let iframeWindow;
     beforeEach(() => {
       postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
       });
       iframeWindow = appendIFrameAndGetWindow();
     });
 
     const connectionResponse = {
       clientName: 'iframe-client',
-      types: MessageTypes,
+      requestNames: RequestNames,
       useEncryption: true,
     };
     
@@ -334,15 +334,15 @@ describe('PostMessenger', () => {
     window.TextEncoder = TextEncoder;
     window.TextDecoder = TextDecoder;
 
-    test('should throw an error immediately if connected client does not have matching message type', async () => {
+    test('should throw an error immediately if connected client does not have matching request name', async () => {
       await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
         clientName: 'iframe-client',
-        types: {},
+        requestNames: {},
         useEncryption: true,
       });
       await expect(async () => {
         await postMessenger.request(MessageKeys.one, {});
-      }).rejects.toThrow(/.*does not have a matching message type.*/gi);
+      }).rejects.toThrow(/.*does not have a matching request name.*/gi);
     });
 
     test('should connect successfully', async () => {
@@ -365,8 +365,8 @@ describe('PostMessenger', () => {
             data: { resProp: true },
             errorMessage: null,
             isError: false,
-            messageId: message.messageId,
-            type: MessageTypes.one,
+            requestId: message.requestId,
+            requestName: RequestNames.one,
           },
           origin: targetOrigin,
         }));
@@ -387,8 +387,8 @@ describe('PostMessenger', () => {
             data: 'rYQvNe+52XQOnBbxkknwHryr7B1e+1/OPBm8BXyx7Kog4DHftBZ4cLEKo6bkEMyu4qKjOsYLnPNJQx4xO1tm2XY84ANCWnQu+gQHmrbeZnY=',
             errorMessage: null,
             isError: false,
-            messageId: message.messageId,
-            type: MessageTypes.one,
+            requestId: message.requestId,
+            requestName: RequestNames.one,
           },
           origin: targetOrigin,
         }));
@@ -411,18 +411,18 @@ describe('PostMessenger', () => {
             iv: window.crypto.getRandomValues(new Uint8Array(16)),
             jsonRequestKey: exportedKey,
             origin: 'https://any-origin-should-work.com',
-            types: MessageTypes,
+            requestNames: RequestNames,
             useEncryption: true,
           },
           errorMessage: null,
           isError: false,
-          messageId: '2342552',
-          type: InternalMessageTypes.postMessengerConnect,
+          requestId: '2342552',
+          requestName: InternalRequestNames.postMessengerConnect,
         },
       }));
       expect(postMessenger.connection).toEqual({
         clientName: 'iframe-client',
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: true,
       });
     });
@@ -440,20 +440,20 @@ describe('PostMessenger', () => {
               iv: window.crypto.getRandomValues(new Uint8Array(16)),
               jsonRequestKey: exportedKey,
               origin: 'https://any-origin-should-work.com',
-              types: MessageTypes,
+              requestNames: RequestNames,
               useEncryption: true,
             },
             errorMessage: null,
             isError: false,
-            messageId: '2342552',
-            type: InternalMessageTypes.postMessengerConnect,
+            requestId: '2342552',
+            requestName: InternalRequestNames.postMessengerConnect,
           },
         }));
       }, 1000);
       const connectionDetails = await pendingConnection;
       expect(connectionDetails).toEqual({
         clientName: 'iframe-client',
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: true,
       });
     });
@@ -477,19 +477,19 @@ describe('PostMessenger', () => {
             iv: window.crypto.getRandomValues(new Uint8Array(16)),
             jsonRequestKey: exportedKey,
             origin: 'https://any-origin-should-work.com',
-            types: MessageTypes,
+            requestNames: RequestNames,
             useEncryption: true,
           },
           errorMessage: null,
           isError: false,
-          messageId: '2342552',
-          type: InternalMessageTypes.postMessengerConnect,
+          requestId: '2342552',
+          requestName: InternalRequestNames.postMessengerConnect,
         },
         origin: trustedOrigin,
       }));
       expect(postMessenger.connection).toEqual({
         clientName: 'iframe-client',
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: true,
       });
     });
@@ -507,13 +507,13 @@ describe('PostMessenger', () => {
             iv: window.crypto.getRandomValues(new Uint8Array(16)),
             jsonRequestKey: exportedKey,
             origin: 'https://any-origin-should-work.com',
-            types: MessageTypes,
+            requestNames: RequestNames,
             useEncryption: true,
           },
           errorMessage: null,
           isError: false,
-          messageId: '2342552',
-          type: InternalMessageTypes.postMessengerConnect,
+          requestId: '2342552',
+          requestName: InternalRequestNames.postMessengerConnect,
         },
         origin: 'https://google.com',
       }));
@@ -534,19 +534,19 @@ describe('PostMessenger', () => {
             iv: window.crypto.getRandomValues(new Uint8Array(16)),
             jsonRequestKey: exportedKey,
             origin: 'https://any-origin-should-work.com',
-            types: MessageTypes,
+            requestNames: RequestNames,
             useEncryption: true,
           },
           errorMessage: null,
           isError: false,
-          messageId: '2342552',
-          type: InternalMessageTypes.postMessengerConnect,
+          requestId: '2342552',
+          requestName: InternalRequestNames.postMessengerConnect,
         },
       }));
       // verify connection received:
       expect(postMessenger.connection).toEqual({
         clientName: 'root-client',
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: true,
       });
 
@@ -558,8 +558,8 @@ describe('PostMessenger', () => {
           data: 'rYQvNe+52XQOnBbxkknwHryr7B1e+1/OPBm8BXyx7Kog4DHftBZ4cLEKo6bkEMyu4qKjOsYLnPNJQx4xO1tm2XY84ANCWnQu+gQHmrbeZnY=',
           errorMessage: null,
           isError: false,
-          messageId: '23423425',
-          type: MessageTypes.one,
+          requestId: '23423425',
+          requestName: RequestNames.one,
         },
       });
       windowRef.sendMessage(messageEvent);
@@ -569,20 +569,20 @@ describe('PostMessenger', () => {
   });
 
   describe('bindResponders', () => {
-    let postMessenger: PostMessenger<typeof MessageTypes>;
+    let postMessenger: PostMessenger<typeof RequestNames>;
     beforeEach(() => {
       postMessenger = new PostMessenger({
         clientName,
-        types: MessageTypes,
+        requestNames: RequestNames,
         useEncryption: false,
       });
     });
 
-    test('should fail if a reserved message responder is provided', () => {
+    test('should fail if a reserved request responder is provided', () => {
       expect(() => {
         // @ts-expect-error: test for non ts consumers
         postMessenger.bindResponders({ postMessengerConnect: () => { return 'something'; } });
-      }).toThrow(/.*reserved message type.*/gi);
+      }).toThrow(/.*reserved request name.*/gi);
     });
 
     test('should bind responder and be called when corresponding message is recieved', async () => {
@@ -597,8 +597,8 @@ describe('PostMessenger', () => {
           data,
           errorMessage: null,
           isError: false,
-          messageId: '23423425',
-          type: MessageTypes.one,
+          requestId: '23423425',
+          requestName: RequestNames.one,
         },
       });
       windowRef.sendMessage(messageEvent);
