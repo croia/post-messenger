@@ -17,14 +17,14 @@ export type Error = {
 /* eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types */
 export const isError = (e: any): e is Error => Boolean(e.message);
 
-export type MessageName<T> = keyof T;
+export type RequestName<T> = keyof T;
 
 export type Responders<T> = {
-  [key in MessageName<T>]?: (data: any, event: WindowEventMap['message']) => Promise<any> | any;
+  [key in RequestName<T>]?: (data: any, event: WindowEventMap['message']) => Promise<any> | any;
 };
 
 export type RequestMessage<T> = {
-  type: string;
+  requestName: string;
   requestId: string;
   data: T;
   isError: boolean;
@@ -35,7 +35,7 @@ export const isRequestMessage = <T>(msg: RequestMessage<T>): msg is RequestMessa
   msg &&
   typeof msg === 'object' &&
   !Array.isArray(msg) &&
-  typeof msg.type === 'string' &&
+  typeof msg.requestName === 'string' &&
   typeof msg.requestId === 'string' &&
   typeof msg.isError === 'boolean' &&
   typeof msg.errorMessage !== 'undefined',

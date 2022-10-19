@@ -11,7 +11,7 @@ import {
   isRequestMessage,
   Listener,
   Listeners,
-  MessageName,
+  RequestName,
   PostMessengerArgs,
   RemoveAllResponders,
   RemoveListener,
@@ -81,7 +81,7 @@ class PostMessenger<T extends Record<string, string>> {
     this.maxResponseTime = maxResponseTime;
 
     if (requestNames.postMessengerConnect) {
-      throw new Error(this.prefix('postMessengerConnect is a reserved request key.'));
+      throw new Error(this.prefix('postMessengerConnect is a reserved request name.'));
     }
 
     this.#requestNames = {
@@ -170,7 +170,7 @@ class PostMessenger<T extends Record<string, string>> {
   /* Sends a message and listens for a response matching a unique message id. */
   async #request<R = any>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
     const requestId = uuidv4();
-    this.logger(`sending request with key '${requestName}' to '${this.targetOrigin}':`, data);
+    this.logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
     await this.#sendRequestMessage(requestName, requestId, data);
     return new Promise((resolve, reject) => {
       let hasCompleted = false;
@@ -217,18 +217,18 @@ class PostMessenger<T extends Record<string, string>> {
   }
 
   /* type safe public request wrapper for #requestNames */
-  request<R = any>(messageKey: MessageName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
-    const requestName = this.#requestNames[messageKey];
-    if (!requestName) {
-      throw new Error(this.prefix(`Unable to find requestName for ${String(messageKey)}`));
+  request<R = any>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+    const matchingRequestName = this.#requestNames[requestName];
+    if (!matchingRequestName) {
+      throw new Error(this.prefix(`Unable to find requestName for ${String(requestName)}`));
     }
 
-    if (this.connection && !this.connection.requestNames[String(messageKey)]) {
+    if (this.connection && !this.connection.requestNames[String(requestName)]) {
       throw new Error(this.prefix(
-        `Connected client ${this.connection.clientName} does not have a matching request name for ${String(messageKey)} so this request will fail.`,
+        `Connected client ${this.connection.clientName} does not have a matching request name for ${String(requestName)} so this request will fail.`,
       ));
     }
-    return this.#request<R>(requestName, data, options);
+    return this.#request<R>(matchingRequestName, data, options);
   }
 
   /* Accepts an object of event requestNames mapping to handlers that return promises.

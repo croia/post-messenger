@@ -11,7 +11,7 @@ interface TestWindow extends Window {
 
 declare let window: TestWindow;
 
-export function buildMessageKeys<T extends string>(messages: Record<string, string>): { [K in T]: K; } {
+export function buildRequestNameKeys<T extends string>(messages: Record<string, string>): { [K in T]: K; } {
   const messageKeys = {};
   Object.keys(messages).forEach((messageKey) => {
     messageKeys[messageKey] = messageKey;
@@ -22,7 +22,7 @@ export function buildMessageKeys<T extends string>(messages: Record<string, stri
 enum RequestNames {
   one = 'test:one',
 }
-const MessageKeys = buildMessageKeys<keyof typeof RequestNames>(RequestNames);
+const RequestNameKeys = buildRequestNameKeys<keyof typeof RequestNames>(RequestNames);
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -141,7 +141,7 @@ describe('PostMessenger', () => {
           clientName,
           requestNames: { postMessengerConnect: 'post-messenger-connect' },
         });
-      }).toThrow(/.*reserved.*message.*/gi);
+      }).toThrow(/.*reserved.*request.*/gi);
     });
   });
 
@@ -236,7 +236,7 @@ describe('PostMessenger', () => {
           origin: targetOrigin,
         }));
       });
-      const response = await postMessenger.request(MessageKeys.one, {});
+      const response = await postMessenger.request(RequestNameKeys.one, {});
       expect(response.resProp).toEqual(true);
     });
 
@@ -265,7 +265,7 @@ describe('PostMessenger', () => {
         }));
       });
       await expect(async () => {
-        await postMessenger.request(MessageKeys.one, {});
+        await postMessenger.request(RequestNameKeys.one, {});
       }).rejects.toThrow(new RegExp(`.*${errorMessage}.*`, 'gi'));
     });
 
@@ -293,7 +293,7 @@ describe('PostMessenger', () => {
         }));
       });
       await expect(async () => {
-        await postMessenger.request(MessageKeys.one, {}, { maxResponseTime: 100 });
+        await postMessenger.request(RequestNameKeys.one, {}, { maxResponseTime: 100 });
       }).rejects.toThrow(new RegExp('.*time out.*', 'gi'));
     });
 
@@ -308,7 +308,7 @@ describe('PostMessenger', () => {
       postMessenger.setTarget(iframeWindow, targetOrigin);
       await beginListeningWithMock(postMessenger);
       await expect(async () => {
-        await postMessenger.request(MessageKeys.one, {});
+        await postMessenger.request(RequestNameKeys.one, {});
       }).rejects.toThrow(new RegExp('.*no connected client.*', 'gi'));
     });
   });
@@ -341,7 +341,7 @@ describe('PostMessenger', () => {
         useEncryption: true,
       });
       await expect(async () => {
-        await postMessenger.request(MessageKeys.one, {});
+        await postMessenger.request(RequestNameKeys.one, {});
       }).rejects.toThrow(/.*does not have a matching request name.*/gi);
     });
 
@@ -373,7 +373,7 @@ describe('PostMessenger', () => {
       });
 
       await expect(async () => {
-        await postMessenger.request(MessageKeys.one, {});
+        await postMessenger.request(RequestNameKeys.one, {});
       }).rejects.toThrow();
     });
 
@@ -395,7 +395,7 @@ describe('PostMessenger', () => {
       });
 
       const encryptSpy = jest.spyOn(window.crypto.subtle, 'encrypt');
-      await postMessenger.request(MessageKeys.one, {});
+      await postMessenger.request(RequestNameKeys.one, {});
       expect(encryptSpy).toHaveBeenCalled();
     });
 
@@ -551,7 +551,7 @@ describe('PostMessenger', () => {
       });
 
       const mockResponder = jest.fn();
-      postMessenger.bindResponders({ [MessageKeys.one]: mockResponder });
+      postMessenger.bindResponders({ [RequestNameKeys.one]: mockResponder });
       await sleep(0); // move to bottom of stack since addListener from bindResponders above is added async
       const messageEvent = buildMessageEvent({
         data: {
@@ -590,7 +590,7 @@ describe('PostMessenger', () => {
       const iframeWindow = appendIFrameAndGetWindow();
       postMessenger.setTarget(iframeWindow, targetOrigin);
       const windowRef = await beginListeningWithMock(postMessenger);
-      postMessenger.bindResponders({ [MessageKeys.one]: mockResponder });
+      postMessenger.bindResponders({ [RequestNameKeys.one]: mockResponder });
       const data = { resProp: true };
       const messageEvent = buildMessageEvent({
         data: {

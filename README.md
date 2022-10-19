@@ -28,7 +28,7 @@ const postMessenger = new PostMessenger({
   clientName: 'parent-client',
 });
 
-// Responders are functions to run when a request with a matching requestName key is received from the connected window
+// Responders are functions to run after receiving a request from the connected window with a matching requestName key
 postMessenger.bindResponders({
   requestSomeDataFromTheApp: ({ someParam }) => {
     // You can return data back to the other window but it should be JSON serializable
@@ -44,7 +44,7 @@ postMessenger.bindResponders({
 // Wait for connection from the iframe:
 await postMessenger.acceptConnections({ origin: iframeSrc });
 
-const response = await postMessenger.request(postMessenger.types.initializeSomeApp, {
+const response = await postMessenger.request(postMessenger.requestNames.initializeSomeApp, {
   // include any data you'd like but it will need to be JSON serializable:
   someMessage: '1234',
 });
@@ -78,7 +78,7 @@ await postMessenger.connect({
   targetWindow: window.parent,
 });
 
-const response = await postMessenger.request(postMessenger.types.requestSomeDataFromTheApp, 3);
+const response = await postMessenger.request(postMessenger.requestNames.requestSomeDataFromTheApp, 3);
 
 console.log({ response }); // { response: 4 }
 ```
