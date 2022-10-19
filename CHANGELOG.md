@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/croia/post-messenger/compare/v1.0.3...v1.0.4) (2022-10-19)
+
+
+### Bug Fixes
+
+* change `types` to less ambiguous `requestNames` and improve docs ([#27](https://github.com/croia/post-messenger/issues/27)) ([a327d23](https://github.com/croia/post-messenger/commit/a327d23a38b29e59b898b6a0a32613f53c9ebbab))
+
 ## [1.0.3](https://github.com/croia/post-messenger/compare/v1.0.2...v1.0.3) (2022-10-05)
 
 
