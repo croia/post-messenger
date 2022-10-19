@@ -84,25 +84,25 @@ console.log({ response }); // { response: 4 }
 ```
 
 ## PostMessenger constructor options
-`clientName` (string, optional), default 'unknown': A name for the PostMessenger instance that is useful for distinguishing clients in the console logs (if enabled).
+`clientName` (`string`, optional), default `'unknown'`: A name for the PostMessenger instance that is useful for distinguishing clients in the console logs (if enabled).
 
-`enableLogging` (bool, optional), default `false`: If true will output logs when sending or receiving requests and the associated data.
+`enableLogging` (`boolean`, optional), default `false`: If true will output logs when sending or receiving requests and the associated data.
 
-`maxResponseTime` in milliseconds (number, optional), default 10000: The max amount of time to wait before considering a request failed and rejecting the `request` promise. Possible reasons for a timeout include the window being disconnected after the connection was established or an async request taking too long. Alternatively you can provide this as an option to an individual `request` call if you expect a specific request to take longer, e.g. `const slowReq = await postMessenger.request(postMessenger.requestNames.slowReq, { maxResponseTime: 20000 }).`
+`maxResponseTime` in milliseconds (`number`, optional), default `10000`: The max amount of time to wait before considering a request failed and rejecting the `request` promise. Possible reasons for a timeout include the window being disconnected after the connection was established or an async request taking too long. Alternatively you can provide this as an option to an individual `request` call if you expect a specific request to take longer, e.g. `const slowReq = await postMessenger.request(postMessenger.requestNames.slowReq, { maxResponseTime: 20000 }).`
 
-`requestNames` ({ [string]: string }, required): Map where the values are the names of requests that are sent or received by the current window or the window you are connecting to. For example if you need to fetch some data in the iframe from the root page you might have a request name `fetchDataFromRootPage`. In general the `requestNames` option should be the exact same in both windows, containing the names of all requests sent between the two.
+`requestNames` (`{ [string]: string }`, required): Map where the values are the names of requests that are sent or received by the current window or the window you are connecting to. For example if you need to fetch some data in the iframe from the root page you might have a request name `fetchDataFromRootPage`. In general the `requestNames` option should be the exact same in both windows, containing the names of all requests sent between the two.
 
 Providing the request names up front instead of sending and listening for arbtrary messages provides an advantage if you're using TypeScript. If so, PostMessenger will validate that the keys provided to `request` and `bindResponders` exist on the requestNames provided when creating the PostMessenger instance. There are a couple other benefits to providing the names up front, such as validating the connected window is expecting the requestName and throwing an error immediately if not, and also allowing multiple PostMessenger instances to avoid request name collisions (e.g. by prefixing request names with "appOne:" or "appTwo:"). However these two issues could be resolved automatically in a future release by handling all requests through a common request wrapper unique to each instance, and requestNames would then be optional for additional type safety.
 
-`useEncryption` (bool, optional), default `true`: See Message Encryption section below for more details.
+`useEncryption` (`boolean`, optional), default `true`: See Message Encryption section below for more details.
 
 ## PostMessenger.connect options
 
-`targetOrigin` (string, required): The origin of the window to send the message to, either the URI or '*'. See also https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#targetorigin.
+`targetOrigin` (`string`, required): The origin of the window to send the message to, either the URI or '*'. See also https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#targetorigin.
 
-`targetWindow` (Window, required): Window to call postMessage on.
+`targetWindow` (`Window`, required): Window to call postMessage on.
 
-`maxRetries` (Optional), default = 10: If the first connection attempt is unsuccessful (the window calling `connect` fails to receive a response from the specified window), PostMessenger will automatically retry once every 500 milliseconds up to the `maxRetries` value. This may help resolve minor race conditions when acceptConnections has not been set up yet in the root window.
+`maxRetries` (`number`, optional), default `10`: If the first connection attempt is unsuccessful (the window calling `connect` fails to receive a response from the specified window), PostMessenger will automatically retry once every 500 milliseconds up to the `maxRetries` value. This may help resolve minor race conditions when acceptConnections has not been set up yet in the root window.
 
 ## Security
 
