@@ -22,7 +22,6 @@ module.exports = {
     ],
   },
   transformIgnorePatterns: [
-    // 'node_modules/(?!auto-bind)',
-    // 'node_modules/(?!uuid)',
+    '<rootDir>/node_modules/(?!auto-bind)',
   ],
 };

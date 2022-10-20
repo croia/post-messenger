@@ -13,6 +13,7 @@ export const exportedKey = {
   kty: 'oct',
 };
 
+// See https://bit.ly/3eLTTjg. In >= node 15 we can assign this to window.crypto.webcrypto
 Object.defineProperty(global.self, 'crypto', {
   value: {
     getRandomValues: (): Uint8Array => new Uint8Array([15, 177, 95, 199, 168, 147, 123, 246, 43, 133, 14, 112, 205, 210, 235, 113]),
