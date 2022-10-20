@@ -2,16 +2,16 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
       "types": [
-        "jest",
         "node",
+        "jest",
       ],
     },
     "include": [
-      "src/**/*",
-      "test/**/*",
+      "src",
+      "test",
     ],
     "exclude": [
-      "./node_modules",
-      "./dist",
+      "node_modules",
+      "dist",
     ]
 }

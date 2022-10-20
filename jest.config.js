@@ -8,7 +8,6 @@ module.exports = {
     '!<rootDir>/node_modules/',
   ],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
-  preset: 'ts-jest',
   setupFiles: [],
   testEnvironment: 'jsdom',
   transform: {
@@ -16,7 +15,7 @@ module.exports = {
     '.(ts|tsx)': [
       'ts-jest',
       {
-        compiler: 'ttypescript',
+        compiler: 'typescript',
         tsconfig: '<rootDir>/tsconfig-test.json',
       },
     ],
