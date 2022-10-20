@@ -1,113 +1,119 @@
 # PostMessenger
 
-## Description
-window.postMessage is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger can connect window objects and wrap postMessage messages in promises to make communication easier to manage.
- 
-## Encryption
-For cases in which other potentially untrusted scripts are running on the same domain, encryption can be used to prevent those scripts from reading messages. For example if you're building an extension that needs to communicate from the root page to a trusted iframe you may not have control over all the scripts loaded by the root page. These scripts could intercept messages coming back from the trusted iframe to the root page domain. If this is a concern for your app you can set `useEncryption: true` to dynamically generate an encryption key that is passed to the secondary trusted domain so it is known only to your script and the trusted domain.
+`window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
 
 ## Example Usage
-```javascript
-import { PostMessenger } from '@coreymartin/post-messenger';
 
-const types = { init: 'init' };
+Since this library is just a wrapper for `window.postMessage`, PostMessenger should work between any two windows objects that `window.postMessage` supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts on both windows:
+
+```javascript
+// From the root page window:
+import { PostMessenger } from '@croia/post-messenger';
+
+// Create and append the iframe to communicate with:
+const iframeSrc = 'https://some.app';
+const iframe = document.createElement('iframe');
+iframe.src = iframeSrc;
+document.body.appendChild(iframe);
 
 const postMessenger = new PostMessenger({
-  types,
-  enableLogging: __DEVELOPMENT__,
-  // name to help distinguish window objects, used by logger:
-  clientName: 'iframe-app',
-  useEncryption: false,
+  requestNames: {
+    // These are just some example request names, call yours whatever you'd like.
+    initializeSomeApp: 'mainApp:initializeTheApp',
+    requestSomeDataFromTheApp: 'mainApp:requestSomeDataFromTheApp',
+    someOtherRequest: 'mainApp:someOtherRequest',
+  },
+  enableLogging: true,
+  // Help identify this instance in the logs with a name:
+  clientName: 'parent-client',
 });
 
-
-// set the target iframe and url to post messages to with .request
-postMessenger.setTarget(window.parent, parentOriginUrl);
-
-// add responders, functions to run when a request of a certain type is received
+// Responders are functions to run after receiving a request from the connected window with a matching requestName key
 postMessenger.bindResponders({
-  [postMessenger.types.openApp]: (data) => {
-    openApp();
-    // return values are serialized and passed back to window that made the request
+  requestSomeDataFromTheApp: ({ someParam }) => {
+    // You can return data back to the other window but it should be JSON serializable
+    return someParam + 1;
+  }
+  // you can also return a promise and PostMessenger will await it for you and return any errors to the other window
+  someOtherRequest: async ({ someValue }) => {
+    const result = await makeAnAsyncRequest(someValue);
+    return result;
+  }
+});
+
+// Wait for connection from the iframe:
+await postMessenger.acceptConnections({ origin: iframeSrc });
+
+const response = await postMessenger.request(postMessenger.requestNames.initializeSomeApp, {
+  // include any data you'd like but it will need to be JSON serializable:
+  someMessage: '1234',
+});
+
+console.log({ response });
+
+// From the iframe:
+import { PostMessenger } from '@croia/post-messenger';
+
+const postMessenger = new PostMessenger({
+  types: {
+    initializeSomeApp: 'mainApp:initializeTheApp',
+    requestSomeDataFromTheApp: 'mainApp:requestSomeDataFromTheApp',
+    someOtherRequest: 'mainApp:someOtherRequest',
+  },
+  enableLogging: true,
+  clientName: 'child-client',
+});
+
+postMessenger.bindResponders({
+  initializeSomeApp: ({ someMessage }) => {
+    console.log({ someMessage });
     return true;
-  },
+  }
 });
 
-// begin listening and accept all messages
-postMessenger.beginListening(() => true, __DEVELOPMENT__);
-
-// send the request from the base page
-postMessenger.request(postMessenger.types.openApp, { options });
-```
-
-## API Documentation
-
-#### `setClientName(name: string): void`
-Set the name of the client that is used by the logger.  
-
-```javascript
-postMessenger.setClientName('iframe-app');
-```
-
-#### `setTarget(target: string): void`
-Set the `target` and `targetOrigin` of where messages using `.request` will go to.
-
-```javascript
-postMessenger.setTarget(iframe.current.contentWindow, 'https://iframe.domain/index.html');
-```
-
-#### `bindResponders(responders: Object): RemoveAllListeners`
-Accepts an object of event types mapping to handlers that return promises. Adds listeners that expect messages sent by the request function above in order to return a corresponding messageI
-
-```javascript
-postMessenger.bindResponders({
-  'my-message-type': (data) => {
-    console.log(data);
-  },
+// Initialize connection with the root window
+await postMessenger.connect({
+  targetOrigin: 'https://root-page.app',
+  // Use window.parent here since this is an iframe and we are trying to connect to the parent page:
+  targetWindow: window.parent,
 });
+
+const response = await postMessenger.request(postMessenger.requestNames.requestSomeDataFromTheApp, 3);
+
+console.log({ response }); // { response: 4 }
 ```
 
-#### `request(type: string, data:? any): Promise<any>`
-Sends a message and listens for a response matching a unique message id. Example:
+## PostMessenger constructor options
+`clientName` (`string`, optional), default `'unknown'`: A name for the PostMessenger instance that is useful for distinguishing clients in the console logs (if enabled).
 
+`enableLogging` (`boolean`, optional), default `false`: If true will output logs when sending or receiving requests and the associated data.
+
+`maxResponseTime` in milliseconds (`number`, optional), default `10000`: The max amount of time to wait before considering a request failed and rejecting the `request` promise. Possible reasons for a timeout include the window being disconnected after the connection was established or an async request taking too long. Alternatively you can provide this as an option to an individual `request` call if you expect a specific request to take longer, e.g.
 ```javascript
-const { data  } = await postMessenger.request('request-type', { props });
+const slowReq = await postMessenger.request(postMessenger.requestNames.slowReq, { maxResponseTime: 20000 });
 ```
 
-#### `beginListening(validateOriginFn: func, enableLogging:? bool = false): void`
-Begin listening for messages from other clients using `.postMessage`. The first required argument is used when receiving messages to validate that the origin is coming from a trusted source.
+`requestNames` (`{ [string]: string }`, required): Map where the values are the names of requests that are sent or received by the current window or the window you are connecting to. For example if you need to fetch some data in the iframe from the root page you might have a request name `fetchDataFromRootPage`. In general the `requestNames` option should be the exact same in both windows, containing the names of all requests sent between the two.
 
-```javascript
-postMessenger.beginListening(origin => origin === iFrameOrigin, process.env.NODE_ENV === 'development');
-```
+Providing the request names up front instead of sending and listening for arbtrary messages provides an advantage if you're using TypeScript. If so, PostMessenger will validate that the keys provided to `request` and `bindResponders` exist on the requestNames provided when creating the PostMessenger instance. There are a couple other benefits to providing the names up front, such as validating the connected window is expecting the requestName and throwing an error immediately if not, and also allowing multiple PostMessenger instances to avoid request name collisions (e.g. by prefixing request names with "appOne:" or "appTwo:"). However these two issues could be resolved automatically in a future release by handling all requests through a common request wrapper unique to each instance, and requestNames would then be optional for additional type safety.
 
-#### `stopListening(): void`
-Stop listening for messages from other clients using `.postMessage`.
+`useEncryption` (`boolean`, optional), default `true`: See Message Encryption section below for more details.
 
-```javascript
-postMessenger.stopListening();
-```
+## PostMessenger.connect options
 
-#### `addListener(type: string, handlerFunction: func): RemoveListener`
-Add a listener of a specified type that will get invoked if a listener of this type is posted to the current frame.
+`targetOrigin` (`string`, required): The origin of the window to send the message to, either the URI or '*'. See also https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#targetorigin.
 
-#### `removeListener(type: string, handlerFunction: func): void`
-This function is returned by `addListener` and can be used to remove the listener for the specified `type` and `handlerFunction`.
+`targetWindow` (`Window`, required): Window to call postMessage on.
 
+`maxRetries` (`number`, optional), default `10`: If the first connection attempt is unsuccessful (the window calling `connect` fails to receive a response from the specified window), PostMessenger will automatically retry once every 500 milliseconds up to the `maxRetries` value. This may help resolve minor race conditions when acceptConnections has not been set up yet in the root window.
 
-## Configuration
+## Security
 
-#### `fromTypes`
-The types of available messages to receive from other frames.
+In general be sure to follow the security recommendations [here](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns). You should always specify both window origins when possible and PostMessenger will verify all messages are to and from the expected origin.
+ 
+## Message encryption
+Messages are encrypted by default which is useful when other potentially untrusted scripts are running on the same domain. For example if you're building an extension that needs to communicate from the root page to a trusted iframe you may not have control over all the scripts loaded by the root page. These scripts could intercept messages coming back from the trusted iframe to the root page domain. By default PostMessenger will generate an encryption key that is passed to the secondary trusted domain so it is known only to your script and the trusted domain. If this is not a concern for your app you can set `useEncryption: false`.
 
-#### `toTypes`
-The types of available messages to send to other frames.
+## acceptConnections
 
-## Development
-1. `npm i` to download and install dependencies.
-2. `npm run build` to build the files.
-3. `npm run build:watch` to watch the files and build on change.
-
-## Deployment
-- TODO
-
+By default a specific root page `origin` must be provided `allowAnyOrigin` is `false` by default. If for some reason it's not possible to know in advance the domain of the root page that is sending the connection request you can pass `allowAnyOrigin: true` but be aware that any page could simulate a connection request to your app. You must take extra care in this case not to expose sensitive information or else ensure your app is only able to perform sensitive tasks using an API access key provided by the root page domain that a malicious third party wouldn't have.
