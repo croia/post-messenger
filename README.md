@@ -34,7 +34,7 @@ postMessenger.bindResponders({
     // You can return data back to the other window but it should be JSON serializable
     return someParam + 1;
   }
-  // you can also return a promise and PostMessenger will await it for you up to and return any errors to the other window
+  // you can also return a promise and PostMessenger will await it for you and return any errors to the other window
   someOtherRequest: async ({ someValue }) => {
     const result = await makeAnAsyncRequest(someValue);
     return result;
