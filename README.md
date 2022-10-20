@@ -77,12 +77,15 @@ postMessenger.bindResponders({
 // Initialize connection with the root window
 await postMessenger.connect({
   targetOrigin: 'https://root-page.app',
-  // Use window.parent here since this is an iframe and we are trying to connect to the parent page:
+  // The root window is the iframe parent, window.parent
   targetWindow: window.parent,
 });
 
 // Now that we are connected we can send and await requests to the root window
-const response = await postMessenger.request(postMessenger.requestNames.requestDataFromRootWindow, 3);
+const response = await postMessenger.request(
+  postMessenger.requestNames.requestDataFromRootWindow,
+  3,
+);
 
 console.log({ response }); // { response: 4 }
 ```
