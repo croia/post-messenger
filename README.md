@@ -4,7 +4,7 @@
 
 ## Example Usage
 
-Since this library is just a wrapper, PostMessenger should work between any two windows objects that `window.postMessage` supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts on both windows. From the root page window:
+Since this library is just a wrapper, PostMessenger should work between any two windows objects that postMessage supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts on both windows. From the root page window:
 
 ```javascript
 import { PostMessenger } from '@croia/post-messenger';
@@ -92,14 +92,18 @@ console.log({ response }); // { response: 4 }
 
 `enableLogging` (boolean, optional), default `false`: If true will output logs when sending or receiving requests and the associated data.
 
-`maxResponseTime` in milliseconds (number, optional), default `10000`: The max amount of time to wait before considering a request failed and rejecting the `request` promise. Possible reasons for a timeout include the window being disconnected after the connection was established or an async request taking too long. Alternatively you can provide this as an option to an individual `request` call if you expect a specific request to take longer, e.g.
+`maxResponseTime` in milliseconds (number, optional), default `10000`: The max amount of time to wait before considering a request failed and rejecting the promise. Possible reasons for a timeout include the window being disconnected after the connection was established or an async request taking too long. Alternatively you can provide this as an option to an individual request call if you expect a specific request to take longer, e.g.
+
 ```javascript
-const slowReq = await postMessenger.request(postMessenger.requestNames.slowReq, { maxResponseTime: 20000 });
+const slowReq = await postMessenger.request(
+  postMessenger.requestNames.slowReq,
+  { maxResponseTime: 20000 },
+);
 ```
 
 `requestNames` ({ [string]: string }, required): Map where the values are the names of requests that are sent or received by the current window or the window you are connecting to. For example if you need to fetch some data in the iframe from the root page you might have a request name `fetchDataFromRootPage`. In general the `requestNames` option should be the exact same in both windows, containing the names of all requests sent between the two.
 
-Providing the request names up front instead of sending and listening for arbtrary messages provides an advantage if you're using TypeScript. If so, PostMessenger will validate that the keys provided to `request` and `bindResponders` exist on the requestNames provided when creating the PostMessenger instance. There are a couple other benefits to providing the names up front, such as validating the connected window is expecting the requestName and throwing an error immediately if not, and also allowing multiple PostMessenger instances to avoid request name collisions (e.g. by prefixing request names with "appOne:" or "appTwo:"). However these two issues could be resolved automatically in a future release by handling all requests through a common request wrapper unique to each instance, and requestNames would then be optional for additional type safety.
+Providing the request names up front instead of sending and listening for arbtrary messages provides an advantage if you're using TypeScript. If so, PostMessenger will validate that the keys provided to the request and bindResponders functions exist on the `requestNames` provided when creating the PostMessenger instance. There are a couple other benefits to providing the names up front, such as validating the connected window is expecting the requestName and throwing an error immediately if not, and also allowing multiple PostMessenger instances to avoid request name collisions (e.g. by prefixing request names with "appOne:" or "appTwo:"). However these two issues could be resolved automatically in a future release by handling all requests through a common request wrapper unique to each instance, and requestNames would then be optional for additional type safety.
 
 `useEncryption` (boolean, optional), default `true`: See Message Encryption section below for more details.
 
