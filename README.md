@@ -49,7 +49,7 @@ const response = await postMessenger.request(postMessenger.requestNames.initiali
   someMessage: '1234',
 });
 
-console.log({ response });
+console.log({ response }); // { response: true } (iframe responder returns true, see example below)
 
 // From the iframe:
 import { PostMessenger } from '@croia/post-messenger';
@@ -66,7 +66,7 @@ const postMessenger = new PostMessenger({
 
 postMessenger.bindResponders({
   initializeSomeApp: ({ someMessage }) => {
-    console.log({ someMessage });
+    console.log({ someMessage }); // { someMessage: '1234' }
     return true;
   }
 });
