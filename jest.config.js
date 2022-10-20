@@ -1,20 +1,28 @@
+// const { defaults: tsjPreset } = require('ts-jest/presets');
+
+// console.log(tsjPreset);
+
 module.exports = {
-  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!<rootDir>/node_modules/', '!src/types/**/*', '!src/generated/**/*'],
-  globals: {
-    'ts-jest': {
-      compiler: 'ttypescript',
-      tsconfig: '<rootDir>/tsconfig-test.json',
-    },
-  },
+  collectCoverageFrom: [
+    '<rootDir>/src/**/*.{ts,tsx}',
+    '!<rootDir>/node_modules/',
+  ],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
   preset: 'ts-jest',
   setupFiles: [],
   testEnvironment: 'jsdom',
   transform: {
     '.(js|jsx)': 'babel-jest',
-    '.(ts|tsx)': 'ts-jest',
+    '.(ts|tsx)': [
+      'ts-jest',
+      {
+        compiler: 'ttypescript',
+        tsconfig: '<rootDir>/tsconfig-test.json',
+      },
+    ],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!auto-bind)',
+    // 'node_modules/(?!auto-bind)',
+    // 'node_modules/(?!uuid)',
   ],
 };

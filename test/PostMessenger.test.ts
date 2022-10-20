@@ -1,5 +1,5 @@
 import { buildMessageEvent } from './factories';
-import { crypto, exportedKey, TextDecoder, textDecoderResponse, TextEncoder } from './mocks';
+import { exportedKey, TextDecoder, textDecoderResponse, TextEncoder } from './mocks';
 import { PostMessenger } from '../src/index';
 import { ConnectionDetails, InternalRequestNames } from '../src/types';
 
@@ -330,7 +330,6 @@ describe('PostMessenger', () => {
       useEncryption: true,
     };
     
-    window.crypto = crypto;
     window.TextEncoder = TextEncoder;
     window.TextDecoder = TextDecoder;
 
