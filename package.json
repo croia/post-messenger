@@ -1,6 +1,6 @@
 {
   "name": "@croia/post-messenger",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Client side module for connecting window objects and turning messages between them into promises",
   "main": "dist/index.js",
   "scripts": {
@@ -29,9 +29,9 @@
     "@semantic-release/changelog": "6.0.1",
     "@semantic-release/git": "10.0.1",
     "@types/jest": "27.5.2",
-    "@types/node": "16.11.64",
-    "@typescript-eslint/eslint-plugin": "5.39.0",
-    "@typescript-eslint/parser": "5.39.0",
+    "@types/node": "16.11.66",
+    "@typescript-eslint/eslint-plugin": "5.40.0",
+    "@typescript-eslint/parser": "5.40.0",
     "babel-jest": "27.5.1",
     "eslint": "8.24.0",
     "eslint-config-airbnb-typescript": "17.0.0",
