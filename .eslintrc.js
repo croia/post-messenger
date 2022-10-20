@@ -6,8 +6,7 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
-    'plugin:react/recommended',
-    'airbnb-typescript',
+    'airbnb-typescript/base',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -19,6 +18,9 @@ module.exports = {
     '@typescript-eslint',
   ],
   rules: {
+    '@typescript-eslint/ban-ts-comment': ['error', {
+      'ts-expect-error': 'allow-with-description',
+    }],
     '@typescript-eslint/explicit-module-boundary-types': ['error', {
       allowArgumentsExplicitlyTypedAsAny: false,
       allowDirectConstAssertionInArrowFunctions: true,
@@ -26,9 +28,6 @@ module.exports = {
       allowTypedFunctionExpressions: true,
     }],
     '@typescript-eslint/member-delimiter-style': ['error'],
-    '@typescript-eslint/ban-ts-comment': ['error', {
-      'ts-expect-error': 'allow-with-description'
-    }],
     'arrow-parens': [
       'error',
       'as-needed',
