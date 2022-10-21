@@ -112,7 +112,7 @@ Providing the request names up front instead of sending and listening for arbtra
 
 ## PostMessenger.connect options
 
-`targetOrigin` (string, required): The origin of the window to send the message to, either the URI or '*'. See also https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#targetorigin.
+`targetOrigin` (string, required): The origin of the window to send the message to, either the URI or `'*'`. See also https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#targetorigin.
 
 `targetWindow` (Window, required): Window to call postMessage on.
 
