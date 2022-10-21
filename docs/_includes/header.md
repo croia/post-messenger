@@ -18,12 +18,7 @@
         </label>
 
         <div class="trigger">
-          {%- for path in page_paths -%}
-            {%- assign my_page = site.pages | where: "path", path | first -%}
-            {%- if my_page.title -%}
-            <a class="page-link" href="{{ site.github.repository_url }}">{{ my_page.title | escape }}</a>
-            {%- endif -%}
-          {%- endfor -%}
+          <a class="page-link" href="{{ site.github.repository_url }}">Github</a>
         </div>
       </nav>
     {%- endif -%}
