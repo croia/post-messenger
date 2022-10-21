@@ -1,3 +1,4 @@
-theme: minima
-url: croia.github.io
-baseurl: /post-messenger
+remote_theme: jekyll/minima
+
+minima:
+  skin: solarized-dark
