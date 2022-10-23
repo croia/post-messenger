@@ -1,3 +1,10 @@
+## [1.0.8](https://github.com/croia/post-messenger/compare/v1.0.7...v1.0.8) (2022-10-23)
+
+
+### Bug Fixes
+
+* copy README to package contents ([#48](https://github.com/croia/post-messenger/issues/48)) ([1767b7b](https://github.com/croia/post-messenger/commit/1767b7b38a2d41e7718305757eb65ecf30316571))
+
 ## [1.0.7](https://github.com/croia/post-messenger/compare/v1.0.6...v1.0.7) (2022-10-23)
 
 
