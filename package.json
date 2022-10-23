@@ -18,6 +18,7 @@
     "url": "github:croia/post-messenger"
   },
   "publishConfig": {
+    "access": "public",
     "registry": "https://registry.npmjs.org"
   },
   "dependencies": {
