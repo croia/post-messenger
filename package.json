@@ -18,7 +18,7 @@
     "url": "github:croia/post-messenger"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "dependencies": {
     "auto-bind": "^5.0.1",
