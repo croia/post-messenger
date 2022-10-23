@@ -1,6 +1,6 @@
 # PostMessenger
 
-`window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
+`window.postMessage` is used to send messages between window objects but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
 
 ## Install
 
