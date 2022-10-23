@@ -2,6 +2,12 @@
 
 `window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
 
+## Install
+
+```
+npm i @croia/post-messenger
+```
+
 ## Example Usage
 
 Since this library is just a wrapper, PostMessenger should work between any two windows objects that postMessage supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts on both windows. From the root page window:
