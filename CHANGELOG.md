@@ -1,3 +1,10 @@
+## [1.0.9](https://github.com/croia/post-messenger/compare/v1.0.8...v1.0.9) (2022-10-23)
+
+
+### Bug Fixes
+
+* add package keywords ([#49](https://github.com/croia/post-messenger/issues/49)) ([31de5b4](https://github.com/croia/post-messenger/commit/31de5b47e39bc3fc2457359b158eed6497990c4f))
+
 ## [1.0.8](https://github.com/croia/post-messenger/compare/v1.0.7...v1.0.8) (2022-10-23)
 
 
