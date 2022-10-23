@@ -21,6 +21,10 @@
     "access": "public",
     "registry": "https://registry.npmjs.org"
   },
+  "keywords": [
+    "postmessage",
+    "iframe"
+  ],
   "dependencies": {
     "auto-bind": "^5.0.1",
     "uuid": "^9.0.0"
