@@ -4,7 +4,7 @@
   "description": "Client side module for connecting window objects and turning messages between them into promises",
   "main": "dist/index.js",
   "scripts": {
-    "build": "npx tsc && cp ./package.json ./dist/package.json",
+    "build": "npx tsc && cp ./package.json ./dist/package.json && cp ./docs/README.md ./dist/README.md",
     "clean": "rm -rf ./dist",
     "lint": "eslint ./src",
     "test": "tsc --noEmit --project tsconfig-test.json && jest --no-cache --runInBand --bail",
