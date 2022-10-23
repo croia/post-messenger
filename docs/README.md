@@ -44,10 +44,11 @@ postMessenger.bindResponders({
 await postMessenger.acceptConnections({ origin: iframeSrc });
 
 // Now that we are connected we can send and await requests to the iframe
-const response = await postMessenger.request(postMessenger.requestNames.initializeIFrame, {
+const response = await postMessenger.request(
+  postMessenger.requestNames.initializeIFrame,
   // include any data you'd like but it will need to be JSON serializable:
-  someMessage: '1234',
-});
+  { someMessage: '1234' },
+);
 
 console.log({ response }); // { response: true } (iframe responder returns true, see example below)
 ```
@@ -83,8 +84,7 @@ await postMessenger.connect({
 
 // Now that we are connected we can send and await requests to the root window
 const response = await postMessenger.request(
-  postMessenger.requestNames.requestDataFromRootWindow,
-  3,
+  postMessenger.requestNames.requestDataFromRootWindow, 3,
 );
 
 console.log({ response }); // { response: 4 }
