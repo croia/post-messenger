@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/croia/post-messenger/compare/v1.0.4...v1.0.5) (2022-10-23)
+
+
+### Bug Fixes
+
+* switch package location to registry.npmjs.org ([#45](https://github.com/croia/post-messenger/issues/45)) ([5236dc1](https://github.com/croia/post-messenger/commit/5236dc10f1896235464d7a91302e6964182a967c))
+
 ## [1.0.4](https://github.com/croia/post-messenger/compare/v1.0.3...v1.0.4) (2022-10-19)
 
 
