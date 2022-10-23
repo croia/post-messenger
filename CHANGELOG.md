@@ -1,3 +1,10 @@
+## [1.0.7](https://github.com/croia/post-messenger/compare/v1.0.6...v1.0.7) (2022-10-23)
+
+
+### Bug Fixes
+
+* npm access scope ([#47](https://github.com/croia/post-messenger/issues/47)) ([e3c15ec](https://github.com/croia/post-messenger/commit/e3c15ecb09da4c631b7dbf9074d4005893f9e610))
+
 ## [1.0.6](https://github.com/croia/post-messenger/compare/v1.0.5...v1.0.6) (2022-10-23)
 
 
