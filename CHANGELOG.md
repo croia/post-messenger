@@ -1,3 +1,10 @@
+## [1.0.10](https://github.com/croia/post-messenger/compare/v1.0.9...v1.0.10) (2022-10-23)
+
+
+### Bug Fixes
+
+* lock file and add install to README ([#50](https://github.com/croia/post-messenger/issues/50)) ([880906f](https://github.com/croia/post-messenger/commit/880906fcfaf7d5b04423b5d8e42b4bd0396dc949))
+
 ## [1.0.9](https://github.com/croia/post-messenger/compare/v1.0.8...v1.0.9) (2022-10-23)
 
 
