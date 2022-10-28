@@ -172,7 +172,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   }
 
   /* Sends a message and listens for a response matching a unique message id. */
-  async #request<R = any>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+  async #request<R = unknown>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
     const requestId = uuidv4();
     this.logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
     await this.#sendRequestMessage(requestName, requestId, data);
@@ -236,7 +236,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   }
 
   /* type safe public request wrapper for #requestNames */
-  request<R = any>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+  request<R = unknown>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
     return this.#request<R>(this.getRequestName(requestName), data, options);
   }
 
@@ -304,17 +304,17 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     if (useEncryption) {
       iv = crypto.getRandomValues(new Uint8Array(16));
       /* encryption code based examples https://bit.ly/3ex4DiQ and https://ibm.co/30ABCdZ */
-    
+
       this.#encryptionValues.requestKey = await crypto.subtle.generateKey(
         { length: 256, name: AESCBC }, // AES in CBC mode, with a key length of 256 bits.
         true, // Allow extracting the key material
         ['encrypt', 'decrypt'], // Restrict usage of the key
       );
       jsonRequestKey = await crypto.subtle.exportKey('jwk', this.#encryptionValues.requestKey);
-    
+
       // AES-CBC requires a 128-bit initialization vector (iv).
       this.#encryptionValues.iv = iv;
-    
+
       // The algorithm is still AES-CBC. The 128-bit iv must be specified.
       this.#encryptionValues.algorithm = { iv, name: AESCBC };
     }
@@ -380,13 +380,13 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
             requestNames: data.requestNames,
             useEncryption: false,
           };
-  
+
           if (this.useEncryption()) {
             if (!data.iv || !data.jsonRequestKey || !data.useEncryption) {
               const errorMsg = 'encryption is required but iv or jsonRequestKey or useEncryption were not provided in connection message.';
               throw new Error(this.prefix(errorMsg));
             }
-  
+
             this.connection.useEncryption = true;
             this.#encryptionValues.iv = new Uint8Array([...data.iv]);
             this.#encryptionValues.algorithm = { iv: this.#encryptionValues.iv, name: AESCBC };
@@ -468,7 +468,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     // This is the plaintext:
     const encoder = new TextEncoder();
     const encodedData = encoder.encode(JSON.stringify(data));
-  
+
     // Finally, encrypt the plaintext, and obtain the ciphertext.
     const encryptedAB = await crypto.subtle.encrypt(
       this.#encryptionValues.algorithm,
@@ -477,7 +477,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
       // The plaintext to encrypt.
       encodedData,
     );
-  
+
     const encryptedText = ab2str(encryptedAB);
     const base64Text = encodeBase64(encryptedText);
     return base64Text;

@@ -108,7 +108,7 @@ async function connectWithMock(
   }
 
   await connectPromise;
-  
+
   return windowRef;
 }
 
@@ -152,7 +152,7 @@ describe('PostMessenger', () => {
       const consoleLogMock = jest.spyOn(console, 'log');
       const consoleWarnMock = jest.spyOn(console, 'warn');
       const consoleErrorMock = jest.spyOn(console, 'error');
-      
+
       postMessenger.logger('sjkdfkjd');
       expect(consoleLogMock).not.toHaveBeenCalled();
       expect(consoleWarnMock).not.toHaveBeenCalled();
@@ -166,8 +166,8 @@ describe('PostMessenger', () => {
       }, RequestNames);
 
       const consoleLogMock = jest.spyOn(console, 'log');
-      
-      postMessenger.logger('sjkdfkjd');
+
+      postMessenger.logger('should log when enableLogging is true');
       expect(consoleLogMock).toHaveBeenCalled();
     });
   });
@@ -175,7 +175,7 @@ describe('PostMessenger', () => {
   describe('addListener and removeListener', () => {
     test('should add and remove listeners successfully', async () => {
       const postMessenger = new PostMessenger({ clientName }, RequestNames);
-      const listener = () => {};
+      const listener = () => { };
       const removeListener = postMessenger.addListener(RequestNames.one, listener);
       let listeners = postMessenger.getListeners();
       expect(Object.keys(listeners)).toHaveLength(1);
@@ -193,16 +193,16 @@ describe('PostMessenger', () => {
       jest.clearAllMocks();
     });
 
-    // test('should throw an error if messageKey does not exist on request names', async () => {
-    //   const postMessenger = new PostMessenger({
-    //     clientName,
-    //     requestNames: RequestNames,
-    //   });
-    //   expect(() => {
-    //     // @ts-expect-error: test for non ts consumers
-    //     postMessenger.request('message:two', {});
-    //   }).toThrow();
-    // });
+    test('should throw an error if messageKey does not exist on request names', async () => {
+      const postMessenger = new PostMessenger({
+        clientName,
+      }, RequestNames);
+
+      expect(() => {
+        // @ts-expect-error: test for non ts consumers
+        postMessenger.request('two', {});
+      }).toThrow();
+    });
 
     test('should send request messages and respond to request messages properly after beginListening is called', async () => {
       const postMessenger = new PostMessenger({
@@ -214,11 +214,12 @@ describe('PostMessenger', () => {
       postMessenger.setTarget(iframeWindow, targetOrigin);
       const windowRef = await beginListeningWithMock(postMessenger);
       const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
+      const responseData = { resProp: true };
       postMessageSpy.mockImplementation(async (message) => {
         await sleep(0); // move to bottom of stack since addListener from beginListening above is added async
         windowRef.sendMessage(buildMessageEvent({
           data: {
-            data: { resProp: true },
+            data: responseData,
             errorMessage: null,
             isError: false,
             requestId: message.requestId,
@@ -227,7 +228,7 @@ describe('PostMessenger', () => {
           origin: targetOrigin,
         }));
       });
-      const response = await postMessenger.request(RequestNameKeys.one, {});
+      const response = await postMessenger.request<typeof responseData>(RequestNameKeys.one, {});
       expect(response.resProp).toEqual(true);
     });
 
@@ -314,11 +315,11 @@ describe('PostMessenger', () => {
       requestNames: RequestNames,
       useEncryption: true,
     };
-    
+
     window.TextEncoder = TextEncoder;
     window.TextDecoder = TextDecoder;
 
-    // test('should throw an error immediately if connected client does not have matching request name', async () => {
+    // test.only('should throw an error immediately if connected client does not have matching request name', async () => {
     //   await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
     //     clientName: 'iframe-client',
     //     requestNames: {},
@@ -326,7 +327,7 @@ describe('PostMessenger', () => {
     //   });
     //   await expect(async () => {
     //     await postMessenger.request(RequestNameKeys.one, {});
-    //   }).rejects.toThrow(/.*does not have a matching request name.*/gi);
+    //   }).rejects.toThrow(/.*unable to find requestName*/gi);
     // });
 
     test('should connect successfully', async () => {

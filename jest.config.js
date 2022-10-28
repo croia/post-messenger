@@ -1,7 +1,3 @@
-// const { defaults: tsjPreset } = require('ts-jest/presets');
-
-// console.log(tsjPreset);
-
 module.exports = {
   collectCoverageFrom: [
     '<rootDir>/src/**/*.{ts,tsx}',
