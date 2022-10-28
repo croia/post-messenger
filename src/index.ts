@@ -53,7 +53,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   targetOrigin: string | null = null;
 
   /* message names to keys representing sent and expected received request names */
-  #internalRequestNames: T | undefined;
+  #requestNames: T | undefined;
 
   #validateOrigin: ValidateOriginFn | null = null;
 
@@ -87,11 +87,11 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     }
 
     this.maxResponseTime = maxResponseTime;
-    this.#internalRequestNames = requestNames;
+    this.#requestNames = requestNames;
   }
 
   get requestNames(): T {
-    return this.#internalRequestNames as T;
+    return this.#requestNames as T;
   }
 
   prefix(str: string): string {
@@ -222,6 +222,10 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
   /* validate requestName exists if optional requestNames are provided to constructor */
   getRequestName(requestName: string): string {
+    if (InternalRequestNames[requestName]) {
+      return InternalRequestNames[requestName];
+    }
+
     if (this.requestNames) {
       if (!this.requestNames[requestName]) {
         throw new Error(this.prefix(`requestNames were provided to constructor but unable to find requestName for ${String(requestName)}`));
@@ -281,10 +285,8 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   }
 
   bindResponders(responders: Responders<T>): RemoveAllResponders {
-    const something = hasOwnProperty(responders, 'postMessengerConnect');
-    console.log({ responders, something });
-    if (hasOwnProperty(responders, 'postMessengerConnect')) {
-      throw new Error(this.prefix('postMessengerConnect is a reserved request name.'));
+    if (hasOwnProperty(responders, InternalRequestKeys.postMessengerConnect)) {
+      throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
     return this.#bindResponders(responders);
   }
