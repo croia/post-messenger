@@ -23,7 +23,7 @@ jobs:
         # semantic release increments the version see https://bit.ly/3yllLkR
         env:
           GITHUB_TOKEN: ${{ secrets.CROIABOT_PAT }}
-          NPM_TOKEN: ${{ secrets.CROIABOT_PAT }}
+          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
           GH_TOKEN: ${{ secrets.CROIABOT_PAT }}
           GIT_AUTHOR_NAME: "croiabot"
           GIT_AUTHOR_EMAIL: "croiabot@gmail.com"

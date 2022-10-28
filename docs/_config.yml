@@ -1,3 +1,4 @@
+# need to use the remote theme to force a version where `skin` is available, see https://stackoverflow.com/a/70721593/9808766
 remote_theme: jekyll/minima
 
 minima:

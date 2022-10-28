@@ -1,6 +1,12 @@
 # PostMessenger
 
-`window.postMessage` is used to send messages between window objects on a page but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
+`window.postMessage` is used to send messages between window objects but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
+
+## Install
+
+```
+npm i @croia/post-messenger
+```
 
 ## Example Usage
 
@@ -44,10 +50,11 @@ postMessenger.bindResponders({
 await postMessenger.acceptConnections({ origin: iframeSrc });
 
 // Now that we are connected we can send and await requests to the iframe
-const response = await postMessenger.request(postMessenger.requestNames.initializeIFrame, {
+const response = await postMessenger.request(
+  postMessenger.requestNames.initializeIFrame,
   // include any data you'd like but it will need to be JSON serializable:
-  someMessage: '1234',
-});
+  { someMessage: '1234' },
+);
 
 console.log({ response }); // { response: true } (iframe responder returns true, see example below)
 ```
@@ -83,8 +90,7 @@ await postMessenger.connect({
 
 // Now that we are connected we can send and await requests to the root window
 const response = await postMessenger.request(
-  postMessenger.requestNames.requestDataFromRootWindow,
-  3,
+  postMessenger.requestNames.requestDataFromRootWindow, 3,
 );
 
 console.log({ response }); // { response: 4 }
