@@ -85,7 +85,7 @@ const requestOne = await postMessenger.request('requestSomeDataFromRootWindow');
 const requestTwo = await postMessager.request('runSomeAsyncProcess', { someValue }) // 'done'
 ```
 
-Turning on console logging and adding a clientName is recommended for development and debugging:
+Turn on enableLogging in both PostMessenger instances to see requests logged to the console
 
 ```javascript
 const postMessenger = new PostMessenger({
@@ -94,7 +94,7 @@ const postMessenger = new PostMessenger({
 });
 ```
 
-If you're using TypeScript, providing the `requestNames` option to the constructor is recommended. That way PostMessenger can validate that the requestNames provided to `bindResponders` and `request` exist on the `requestNames` you provided:
+If you're using TypeScript, providing the `requestNames` option to the constructor is recommended. The type is used to validate that the requestNames provided to `bindResponders` and `request` exist on the `requestNames` you provided. Runtime validation is also performed on requestNames if provided, which may still be useful if you're not using TypeScript:
 
 ```javascript
 enum RequestNames {
@@ -104,9 +104,7 @@ enum RequestNames {
 
 let postMessenger: PostMessenger<typeof RequestNames>;
 
-const postMessenger = new PostMessenger({
-  requestNames: RequestNames,
-});
+const postMessenger = new PostMessenger({ requestNames: RequestNames });
 
 // Wait for connection from the iframe:
 await postMessenger.acceptConnections({ origin: 'https://iframe-src.app' });
