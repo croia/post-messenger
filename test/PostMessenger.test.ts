@@ -319,16 +319,16 @@ describe('PostMessenger', () => {
     window.TextEncoder = TextEncoder;
     window.TextDecoder = TextDecoder;
 
-    // test.only('should throw an error immediately if connected client does not have matching request name', async () => {
-    //   await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
-    //     clientName: 'iframe-client',
-    //     requestNames: {},
-    //     useEncryption: true,
-    //   });
-    //   await expect(async () => {
-    //     await postMessenger.request(RequestNameKeys.one, {});
-    //   }).rejects.toThrow(/.*unable to find requestName*/gi);
-    // });
+    test('should throw an error immediately if connected client does not have matching request name', async () => {
+      await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
+        clientName: 'iframe-client',
+        requestNames: {},
+        useEncryption: true,
+      });
+      await expect(async () => {
+        await postMessenger.request(RequestNameKeys.one, {});
+      }).rejects.toThrow(/.*does not have a matching request name*/gi);
+    });
 
     test('should connect successfully', async () => {
       await connectWithMock(postMessenger, iframeWindow, targetOrigin, connectionResponse);

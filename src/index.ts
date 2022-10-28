@@ -237,6 +237,11 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
   /* type safe public request wrapper for #requestNames */
   request<R = unknown>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+    if (this.connection && this.requestNames && !this.connection.requestNames[String(requestName)]) {
+      throw new Error(this.prefix(
+        `Connected client ${this.connection.clientName} does not have a matching request name for ${String(requestName)} so this request will fail.`,
+      ));
+    }
     return this.#request<R>(this.getRequestName(requestName), data, options);
   }
 
