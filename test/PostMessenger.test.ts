@@ -40,33 +40,40 @@ function appendIFrameAndGetWindow(): Window {
 }
 
 type MessageEventListener = (messageEvent: WindowEventMap['message']) => void;
-type WindowRef = { sendMessage: MessageEventListener | (() => void) };
+type WindowRef = { sendMessage: (messageEvent: WindowEventMap['message']) => void };
 
-/* wait for next addEventListener to be called on window and return
-   an object that will contain a reference to call the added function.
-   this is essentially mocking sending a message to the current window: */
+function buildExternalPromise<T>() {
+  let resolveExternalPromise: (returnValue: T) => void = () => undefined;
+  const externalPromise: Promise<T> = new Promise((resolve) => { resolveExternalPromise = resolve; });
+  return { externalPromise, resolveExternalPromise };
+}
+
+/* Wait for next addEventListener to be called on window and return
+   a windowRef object with a reference to call the added function.
+   This is essentially mocking sending a message to the current window: */
 function buildWindowRef(): WindowRef {
   const windowSpy = jest.spyOn(window, 'addEventListener');
+  const { externalPromise, resolveExternalPromise } = buildExternalPromise<MessageEventListener>();
   const windowRef: WindowRef = {
-    /* until addEventListener is called, sendMessage should just be a function that throws an error */
-    sendMessage: () => {
-      throw new Error('addEventListener was never called');
+    sendMessage: async (message) => {
+      const handler = await externalPromise;
+      handler(message);
     },
   };
+
+  /* when the next addEventListener is called resolve sendMessage promise: */
   windowSpy.mockImplementation((eventType, handler) => {
     if (eventType === 'message' && typeof handler === 'function') {
-      windowRef.sendMessage = handler;
+      resolveExternalPromise(handler);
     }
   });
   return windowRef;
 }
 
-async function beginListeningWithMock(postMessengerInstance: PostMessenger<typeof RequestNames>): Promise<WindowRef> {
-  return new Promise((resolve) => {
-    const windowRef = buildWindowRef();
-    postMessengerInstance.beginListening(() => true);
-    resolve(windowRef);
-  });
+function beginListeningWithMock(postMessengerInstance: PostMessenger<typeof RequestNames>): WindowRef {
+  const windowRef = buildWindowRef();
+  postMessengerInstance.beginListening(() => true);
+  return windowRef;
 }
 
 async function connectWithMock(
@@ -89,8 +96,7 @@ async function connectWithMock(
   }
 
   postMessageSpy.mockImplementationOnce(async (message) => {
-    await sleep(0); // move to bottom of stack since addListener from connect above is added async
-    windowRef.sendMessage(buildMessageEvent({
+    await windowRef.sendMessage(buildMessageEvent({
       data: {
         data: connectResponse,
         errorMessage: null,
@@ -216,8 +222,7 @@ describe('PostMessenger', () => {
       const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       const responseData = { resProp: true };
       postMessageSpy.mockImplementation(async (message) => {
-        await sleep(0); // move to bottom of stack since addListener from beginListening above is added async
-        windowRef.sendMessage(buildMessageEvent({
+        await windowRef.sendMessage(buildMessageEvent({
           data: {
             data: responseData,
             errorMessage: null,
@@ -228,6 +233,7 @@ describe('PostMessenger', () => {
           origin: targetOrigin,
         }));
       });
+
       const response = await postMessenger.request<typeof responseData>(RequestNameKeys.one, {});
       expect(response.resProp).toEqual(true);
     });
@@ -244,8 +250,7 @@ describe('PostMessenger', () => {
       const errorMessage = 'Some more specific error message';
       const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       postMessageSpy.mockImplementation(async (message) => {
-        await sleep(0);
-        windowRef.sendMessage(buildMessageEvent({
+        await windowRef.sendMessage(buildMessageEvent({
           data: {
             data: { resProp: true },
             errorMessage,
@@ -271,8 +276,7 @@ describe('PostMessenger', () => {
       const windowRef = await beginListeningWithMock(postMessenger);
       const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       postMessageSpy.mockImplementation(async () => {
-        await sleep(0);
-        windowRef.sendMessage(buildMessageEvent({
+        await windowRef.sendMessage(buildMessageEvent({
           data: {
             data: { resProp: true },
             errorMessage: null,
@@ -345,8 +349,7 @@ describe('PostMessenger', () => {
       const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       const nonStringResponseData = { resProp: 'something' };
       postMessageSpy.mockImplementation(async (message: any) => {
-        await sleep(0); // move to bottom of stack since addListener from connect above is added async
-        windowRef.sendMessage(buildMessageEvent({
+        await windowRef.sendMessage(buildMessageEvent({
           data: {
             data: nonStringResponseData,
             errorMessage: null,
@@ -367,8 +370,7 @@ describe('PostMessenger', () => {
       const windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, connectionResponse);
       const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       postMessageSpy.mockImplementation(async (message: any) => {
-        await sleep(0); // move to bottom of stack since addListener from connect above is added async
-        windowRef.sendMessage(buildMessageEvent({
+        await windowRef.sendMessage(buildMessageEvent({
           data: {
             data: 'rYQvNe+52XQOnBbxkknwHryr7B1e+1/OPBm8BXyx7Kog4DHftBZ4cLEKo6bkEMyu4qKjOsYLnPNJQx4xO1tm2XY84ANCWnQu+gQHmrbeZnY=',
             errorMessage: null,
@@ -388,9 +390,8 @@ describe('PostMessenger', () => {
     test('should accept connections', async () => {
       const windowRef = buildWindowRef();
       postMessenger.acceptConnections({ allowAnyOrigin: true });
-      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
-      windowRef.sendMessage(buildMessageEvent({
+      await windowRef.sendMessage(buildMessageEvent({
         data: {
           data: {
             clientName: 'iframe-client',
@@ -416,7 +417,6 @@ describe('PostMessenger', () => {
     test('should accept connections and resolve with connection details when connecting client takes a while', async () => {
       const windowRef = buildWindowRef();
       const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
-      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
       setTimeout(() => {
         windowRef.sendMessage(buildMessageEvent({
@@ -454,9 +454,8 @@ describe('PostMessenger', () => {
       const windowRef = buildWindowRef();
       const trustedOrigin = 'https://only-this-origin.com';
       postMessenger.acceptConnections({ allowAnyOrigin: false, origin: trustedOrigin });
-      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
-      windowRef.sendMessage(buildMessageEvent({
+      await windowRef.sendMessage(buildMessageEvent({
         data: {
           data: {
             clientName: 'iframe-client',
@@ -484,15 +483,14 @@ describe('PostMessenger', () => {
       const windowRef = buildWindowRef();
       const trustedOrigin = 'https://only-this-origin.com';
       postMessenger.acceptConnections({ allowAnyOrigin: false, origin: trustedOrigin });
-      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
-      windowRef.sendMessage(buildMessageEvent({
+      await windowRef.sendMessage(buildMessageEvent({
         data: {
           data: {
             clientName: 'iframe-client',
             iv: window.crypto.getRandomValues(new Uint8Array(16)),
             jsonRequestKey: exportedKey,
-            origin: 'https://any-origin-should-work.com',
+            origin: 'https://this-origin-should-fail.com',
             requestNames: RequestNames,
             useEncryption: true,
           },
@@ -508,12 +506,10 @@ describe('PostMessenger', () => {
 
     test('should bind responder and be called when corresponding message is recieved', async () => {
       const windowRef = buildWindowRef();
-      postMessenger.acceptConnections({ allowAnyOrigin: true });
-      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
-
+      const connectionPromise = postMessenger.acceptConnections({ allowAnyOrigin: true });
       expect(postMessenger.connection).toEqual(null); // no connection should exist yet
       // simulate connection message from a root page client to this client:
-      windowRef.sendMessage(buildMessageEvent({
+      await windowRef.sendMessage(buildMessageEvent({
         data: {
           data: {
             clientName: 'root-client',
@@ -529,16 +525,19 @@ describe('PostMessenger', () => {
           requestName: InternalRequestNames.postMessengerConnect,
         },
       }));
-      // verify connection received:
-      expect(postMessenger.connection).toEqual({
+
+      const connection = await connectionPromise;
+      expect(connection).toEqual({
         clientName: 'root-client',
         requestNames: RequestNames,
         useEncryption: true,
       });
 
+      await sleep(0);
       const mockResponder = jest.fn();
       postMessenger.bindResponders({ [RequestNameKeys.one]: mockResponder });
-      await sleep(0); // move to bottom of stack since addListener from bindResponders above is added async
+      await sleep(0);
+
       const messageEvent = buildMessageEvent({
         data: {
           data: 'rYQvNe+52XQOnBbxkknwHryr7B1e+1/OPBm8BXyx7Kog4DHftBZ4cLEKo6bkEMyu4qKjOsYLnPNJQx4xO1tm2XY84ANCWnQu+gQHmrbeZnY=',
@@ -548,8 +547,9 @@ describe('PostMessenger', () => {
           requestName: RequestNames.one,
         },
       });
-      windowRef.sendMessage(messageEvent);
-      await sleep(0); // move to bottom of stack since sendMessage is async
+
+      await windowRef.sendMessage(messageEvent);
+      await sleep(0); // responder is async after the message is received - move to bottom of stack
       expect(mockResponder).toHaveBeenCalledWith(JSON.parse(textDecoderResponse), messageEvent);
     });
   });
@@ -586,7 +586,7 @@ describe('PostMessenger', () => {
           requestName: RequestNames.one,
         },
       });
-      windowRef.sendMessage(messageEvent);
+      await windowRef.sendMessage(messageEvent);
       expect(mockResponder).toHaveBeenCalledWith(data, messageEvent);
     });
   });

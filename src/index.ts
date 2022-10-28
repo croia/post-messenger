@@ -175,8 +175,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   async #request<R = unknown>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
     const requestId = uuidv4();
     this.logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
-    await this.#sendRequestMessage(requestName, requestId, data);
-    return new Promise((resolve, reject) => {
+    const result = new Promise((resolve, reject) => {
       let hasCompleted = false;
       const removeResponseListener = this.addListener(requestName, async (responseMessage): Promise<void> => {
         if (!isRequestMessage<R>(responseMessage)) {
@@ -218,6 +217,10 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
         }
       }, options.maxResponseTime || this.maxResponseTime);
     });
+
+    await this.#sendRequestMessage(requestName, requestId, data);
+
+    return result as Promise<R>;
   }
 
   /* validate requestName exists if optional requestNames are provided to constructor */
