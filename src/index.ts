@@ -7,6 +7,7 @@ import {
   ConnectMessage,
   EncryptionValues,
   InternalRequestNames,
+  InternalRequestKeys,
   isError,
   isRequestMessage,
   Listener,
@@ -20,11 +21,11 @@ import {
   ValidateOriginFn,
   ValidateRequest,
 } from './types';
-import { ab2str, decodeBase64, encodeBase64, str2ab } from './utils';
+import { ab2str, decodeBase64, encodeBase64, hasOwnProperty, str2ab } from './utils';
 
 const AESCBC = 'AES-CBC';
 
-class PostMessenger<T extends Record<string, string>> {
+class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   /* prefixed to messages and log messages to help distinguish sending/receiving side */
   clientName: string;
 
@@ -52,17 +53,19 @@ class PostMessenger<T extends Record<string, string>> {
   targetOrigin: string | null = null;
 
   /* message names to keys representing sent and expected received request names */
-  #requestNames: T & typeof InternalRequestNames;
+  #internalRequestNames: T | undefined;
 
   #validateOrigin: ValidateOriginFn | null = null;
 
-  constructor({
-    clientName = 'unknown',
-    enableLogging = false,
-    useEncryption = true,
-    maxResponseTime = 10000,
-    requestNames,
-  }: PostMessengerArgs<T>) {
+  constructor(
+    {
+      clientName = 'unknown',
+      enableLogging = false,
+      useEncryption = true,
+      maxResponseTime = 10000,
+    }: PostMessengerArgs,
+    requestNames?: T,
+  ) {
     autoBind(this);
     this.clientName = clientName;
     this.#enableLogging = enableLogging;
@@ -78,16 +81,17 @@ class PostMessenger<T extends Record<string, string>> {
       }
       return useEncryptionForMessage;
     };
-    this.maxResponseTime = maxResponseTime;
 
-    if (requestNames.postMessengerConnect) {
-      throw new Error(this.prefix('postMessengerConnect is a reserved request name.'));
+    if (hasOwnProperty(requestNames, InternalRequestKeys.postMessengerConnect)) {
+      throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
 
-    this.#requestNames = {
-      ...requestNames,
-      ...InternalRequestNames,
-    };
+    this.maxResponseTime = maxResponseTime;
+    this.#internalRequestNames = requestNames;
+  }
+
+  get requestNames(): T {
+    return this.#internalRequestNames as T;
   }
 
   prefix(str: string): string {
@@ -216,28 +220,29 @@ class PostMessenger<T extends Record<string, string>> {
     });
   }
 
+  /* validate requestName exists if optional requestNames are provided to constructor */
+  getRequestName(requestName: string): string {
+    if (this.requestNames) {
+      if (!this.requestNames[requestName]) {
+        throw new Error(this.prefix(`requestNames were provided to constructor but unable to find requestName for ${String(requestName)}`));
+      }
+      return this.requestNames[requestName];
+    }
+    return requestName;
+  }
+
   /* type safe public request wrapper for #requestNames */
   request<R = any>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
-    const matchingRequestName = this.#requestNames[requestName];
-    if (!matchingRequestName) {
-      throw new Error(this.prefix(`Unable to find requestName for ${String(requestName)}`));
-    }
-
-    if (this.connection && !this.connection.requestNames[String(requestName)]) {
-      throw new Error(this.prefix(
-        `Connected client ${this.connection.clientName} does not have a matching request name for ${String(requestName)} so this request will fail.`,
-      ));
-    }
-    return this.#request<R>(matchingRequestName, data, options);
+    return this.#request<R>(this.getRequestName(requestName), data, options);
   }
 
   /* Accepts an object of event requestNames mapping to handlers that return promises.
      Adds listeners that expect messages sent by the request function above in
      order to return a corresponding requestId */
-  #bindResponders(responders: Responders<T>, validateRequest: ValidateRequest | null = null): RemoveAllResponders {
+  #bindResponders(responders: Responders<T> | Responders<InternalRequestNames>, validateRequest: ValidateRequest | null = null): RemoveAllResponders {
     const allRemoveFns: RemoveListener[] = [];
     Object.entries(responders).forEach(([messageName, handler]) => {
-      const requestName = this.#requestNames[messageName];
+      const requestName = this.getRequestName(messageName);
       const removeListenerFn = this.addListener(requestName, async (message, event: WindowEventMap['message']): Promise<void> => {
         if (!isRequestMessage(message) || !handler) {
           return;
@@ -276,7 +281,9 @@ class PostMessenger<T extends Record<string, string>> {
   }
 
   bindResponders(responders: Responders<T>): RemoveAllResponders {
-    if (responders.postMessengerConnect) {
+    const something = hasOwnProperty(responders, 'postMessengerConnect');
+    console.log({ responders, something });
+    if (hasOwnProperty(responders, 'postMessengerConnect')) {
       throw new Error(this.prefix('postMessengerConnect is a reserved request name.'));
     }
     return this.#bindResponders(responders);
@@ -320,7 +327,7 @@ class PostMessenger<T extends Record<string, string>> {
           iv,
           jsonRequestKey,
           origin: window.location.origin,
-          requestNames: this.#requestNames,
+          requestNames: this.requestNames,
           useEncryption,
         }, { maxResponseTime });
       } catch (e) { /* ignore */ }
