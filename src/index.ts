@@ -72,7 +72,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     this.useEncryption = (requestName, throwForNoConnection = false): boolean => {
       const useEncryptionForMessage = useEncryption && requestName !== InternalRequestNames.postMessengerConnect;
       if (useEncryptionForMessage && !this.connection && throwForNoConnection) {
-        const error = new Error(this.prefix(`Cannot send request ${requestName}. Encryption is on but there is no connected client.`));
+        const error = new Error(this.#prefix(`Cannot send request ${requestName}. Encryption is on but there is no connected client.`));
         if (typeof throwForNoConnection === 'function') {
           throwForNoConnection(error);
         } else {
@@ -83,25 +83,27 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     };
 
     if (hasOwnProperty(requestNames, InternalRequestKeys.postMessengerConnect)) {
-      throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
+      throw new Error(this.#prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
 
     this.maxResponseTime = maxResponseTime;
     this.#requestNames = requestNames;
+
+    this.#logger('created');
   }
 
   get requestNames(): T {
     return this.#requestNames as T;
   }
 
-  prefix(str: string): string {
+  #prefix(str: string): string {
     return `postMessenger: ${this.clientName} ${str}`;
   }
 
-  logger(...args: unknown[]): void {
+  #logger(...args: unknown[]): void {
     if (this.#enableLogging) {
       if (typeof args[0] === 'string') {
-        console.log(this.prefix(args[0]), ...args.slice(1));
+        console.log(this.#prefix(args[0]), ...args.slice(1));
       } else {
         console.log(...args);
       }
@@ -146,7 +148,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   /* Sends a single message with no expectation for a response. Internal use only, clients should use request */
   #send(message: unknown = {}): void {
     if (!this.targetWindow || !this.targetOrigin) {
-      const errMsg = this.prefix('targetWindow has not been initialized, please ensure you call setTarget before calling beginListening');
+      const errMsg = this.#prefix('targetWindow has not been initialized, please ensure you call setTarget before calling beginListening');
       throw new Error(errMsg);
     }
     this.targetWindow.postMessage(message, this.targetOrigin);
@@ -174,7 +176,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   /* Sends a message and listens for a response matching a unique message id. */
   async #request<R = unknown>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
     const requestId = uuidv4();
-    this.logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
+    this.#logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
     await this.#sendRequestMessage(requestName, requestId, data);
     return new Promise((resolve, reject) => {
       let hasCompleted = false;
@@ -190,7 +192,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
             if (this.useEncryption(requestName, true) && responseMessage.errorMessage) {
               errorMessage = await this.decrypt(responseMessage.errorMessage);
             }
-            const errorMsg = this.prefix(
+            const errorMsg = this.#prefix(
               `Responder for request name '${requestName}' to target '${this.targetOrigin}' ` +
               `failed with message: "${errorMessage}"`,
             );
@@ -199,7 +201,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
             let responseMessageData = responseMessage.data;
             if (this.useEncryption(requestName, true)) {
               if (typeof responseMessage.data !== 'string') {
-                const errorMsg = this.prefix(`encryption is required but request received a non string data response for message: ${requestName}`);
+                const errorMsg = this.#prefix(`encryption is required but request received a non string data response for message: ${requestName}`);
                 reject(new Error(errorMsg));
                 return;
               }
@@ -212,12 +214,17 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
       setTimeout(() => {
         if (!hasCompleted) {
-          const errorMsg = this.prefix(`Time out waiting for target '${this.targetOrigin}' to respond to request name '${requestName}'`);
+          const errorMsg = this.#prefix(`Time out waiting for target '${this.targetOrigin}' to respond to request name '${requestName}'`);
           reject(new Error(errorMsg));
           removeResponseListener();
         }
       }, options.maxResponseTime || this.maxResponseTime);
     });
+  }
+
+  /* type safe public request wrapper for #requestNames */
+  request<R = unknown>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+    return this.#request<R>(this.getRequestName(requestName), data, options);
   }
 
   /* validate requestName exists if optional requestNames are provided to constructor */
@@ -228,16 +235,11 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
     if (this.requestNames) {
       if (!this.requestNames[requestName]) {
-        throw new Error(this.prefix(`requestNames were provided to constructor but unable to find requestName for ${String(requestName)}`));
+        throw new Error(this.#prefix(`requestNames were provided to constructor but unable to find requestName for ${String(requestName)}`));
       }
       return this.requestNames[requestName];
     }
     return requestName;
-  }
-
-  /* type safe public request wrapper for #requestNames */
-  request<R = unknown>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
-    return this.#request<R>(this.getRequestName(requestName), data, options);
   }
 
   /* Accepts an object of event requestNames mapping to handlers that return promises.
@@ -260,18 +262,18 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
         try {
           if (this.useEncryption(requestName, true)) {
             if (typeof data !== 'string') {
-              throw new Error(this.prefix('encryption is required but responder received a non string data response'));
+              throw new Error(this.#prefix('encryption is required but responder received a non string data response'));
             }
             data = await this.decrypt(data);
           }
           const response = await handler(data, event);
-          this.logger(`responding to request name '${requestName}' from target '${this.targetOrigin}':`, response);
+          this.#logger(`responding to request name '${requestName}' from target '${this.targetOrigin}':`, response);
           this.#sendRequestMessage(requestName, message.requestId, response);
         } catch (e) {
           if (isError(e)) {
             this.#sendRequestMessage(requestName, message.requestId, {}, e.message);
           } else {
-            this.#sendRequestMessage(requestName, message.requestId, {}, this.prefix('responder threw a non Error object'));
+            this.#sendRequestMessage(requestName, message.requestId, {}, this.#prefix('responder threw a non Error object'));
           }
         }
       });
@@ -279,21 +281,21 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     });
 
     return () => {
-      this.logger('removing responders:', responders);
+      this.#logger('removing responders:', responders);
       allRemoveFns.forEach(removeFn => removeFn());
     };
   }
 
   bindResponders(responders: Responders<T>): RemoveAllResponders {
     if (hasOwnProperty(responders, InternalRequestKeys.postMessengerConnect)) {
-      throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
+      throw new Error(this.#prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
     return this.#bindResponders(responders);
   }
 
   async connect({ targetWindow, targetOrigin, maxRetries = 10 }: ConnectArgs): Promise<boolean> {
     if (!targetWindow || !targetOrigin) {
-      throw new Error(this.prefix('targetWindow and targetOrigin are required for connect'));
+      throw new Error(this.#prefix('targetWindow and targetOrigin are required for connect'));
     }
     this.setTarget(targetWindow, targetOrigin);
     this.beginListening(origin => (origin === new URL(targetOrigin).origin));
@@ -341,10 +343,10 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     }
 
     if (!this.connection) {
-      throw new Error(this.prefix(`Connection failed after ${tries} attempts over ${(tries * maxResponseTime) / 1000} seconds.`));
+      throw new Error(this.#prefix(`Connection failed after ${tries} attempts over ${(tries * maxResponseTime) / 1000} seconds.`));
     }
 
-    this.logger(`Connection established to ${this.connection.clientName}`, this.connection);
+    this.#logger(`Connection established to ${this.connection.clientName}`, this.connection);
 
     return true;
   }
@@ -355,7 +357,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     origin,
   }: AcceptConnectionsArgs): Promise<ConnectionDetails> {
     if (!allowAnyOrigin && !origin) {
-      throw new Error(this.prefix('allowAnyOrigin must be true if origin is not specified'));
+      throw new Error(this.#prefix('allowAnyOrigin must be true if origin is not specified'));
     }
 
     /* Optionally allow caller to specify client name to accept connections from. This helps
@@ -370,7 +372,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
       const removeResponders = this.#bindResponders({
         postMessengerConnect: async (data: ConnectMessage, event): Promise<ConnectionDetails> => {
           if (!event.source) {
-            throw new Error(this.prefix('event.source is null'));
+            throw new Error(this.#prefix('event.source is null'));
           }
 
           this.setTarget(event.source as Window, data.origin);
@@ -384,7 +386,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
           if (this.useEncryption()) {
             if (!data.iv || !data.jsonRequestKey || !data.useEncryption) {
               const errorMsg = 'encryption is required but iv or jsonRequestKey or useEncryption were not provided in connection message.';
-              throw new Error(this.prefix(errorMsg));
+              throw new Error(this.#prefix(errorMsg));
             }
 
             this.connection.useEncryption = true;
@@ -404,7 +406,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
              is confirmed we should stop listening for future connect messages: */
           removeResponders();
 
-          this.logger(`Accepted connection from ${this.connection.clientName}`, this.connection);
+          this.#logger(`Accepted connection from ${this.connection.clientName}`, this.connection);
 
           resolve(this.connection);
 
@@ -420,7 +422,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
   setTarget(targetWindow: Window, targetOrigin: string): void {
     if (!targetWindow || !targetOrigin) {
-      throw new Error(this.prefix('targetWindow and targetWindow are required for setTarget'));
+      throw new Error(this.#prefix('targetWindow and targetWindow are required for setTarget'));
     }
     this.targetWindow = targetWindow;
     /* validate initTargetOrigin is proper URL: */
@@ -439,7 +441,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
   async decrypt<R = unknown>(data: string): Promise<R> {
     if (!this.#encryptionValues.algorithm || !this.#encryptionValues.requestKey) {
-      throw new Error(this.prefix('encryptionValues must be set before calling decrpyt'));
+      throw new Error(this.#prefix('encryptionValues must be set before calling decrpyt'));
     }
 
     const base64Decoded = decodeBase64(data);
@@ -462,7 +464,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   /* encryption code based examples https://bit.ly/3ex4DiQ and https://ibm.co/30ABCdZ */
   async encrypt(data: unknown): Promise<string> {
     if (!this.#encryptionValues.algorithm || !this.#encryptionValues.requestKey) {
-      throw new Error(this.prefix('encryptionValues must be set before calling encrypt'));
+      throw new Error(this.#prefix('encryptionValues must be set before calling encrypt'));
     }
 
     // This is the plaintext:
