@@ -411,16 +411,28 @@ describe('PostMessenger', () => {
       expect(connectionResponse).toEqual(defaultConnectionDetails);
     });
 
-    // test.only('should throw an error when useEncryption does not match between clients', async () => {
-    //   await expect(async () => {
-    //     const windowRef = buildWindowRef();
-    //     const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
-    //     await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
-    //     expect(postMessenger.connection).toEqual(null);
-    //     windowRef.sendMessage(buildConnectMessage(targetOrigin, { useEncryption: false }));
-    //     await pendingConnection;
-    //   }).toThrow(/.*useEncryption must be the same for both PostMessenger instances*/gi);
-    // });
+    test('should throw an error when useEncryption does not match between clients', async () => {
+      const windowRef = buildWindowRef();
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
+      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
+      windowRef.sendMessage(buildConnectMessage(targetOrigin, { useEncryption: false }));
+      await expect(async () => {
+        await pendingConnection;
+      }).rejects.toThrow(/.*useEncryption must be the same for both PostMessenger instances*/gi);
+    });
+
+    test('should throw an error when requestNames does not match between clients', async () => {
+      const windowRef = buildWindowRef();
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
+      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
+      windowRef.sendMessage(buildConnectMessage(
+        targetOrigin,
+        { requestNames: undefined, useEncryption: false },
+      ));
+      await expect(async () => {
+        await pendingConnection;
+      }).rejects.toThrow(/.*requestNames must be the same for both PostMessenger instances*/gi);
+    });
 
     test('should throw an error when allowAnyOrigin is not true with no origin specified', async () => {
       expect(() => {
