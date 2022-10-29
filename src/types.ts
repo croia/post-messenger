@@ -84,7 +84,7 @@ export type AcceptConnectionsArgs = {
 export type ConnectionDetails = {
   useEncryption: boolean;
   clientName: string;
-  requestNames: Record<string, string>;
+  requestNames: Record<string, string> | undefined;
 };
 
 export enum InternalRequestNames {
