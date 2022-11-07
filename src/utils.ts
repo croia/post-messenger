@@ -40,3 +40,16 @@ export function objectKeyMap<T extends string>(obj: Record<string, string>): { [
   });
   return objectKeys as { [K in T]: K; };
 }
+
+export function shallowCompare(objA: Record<string, unknown>, objB: Record<string, unknown>): boolean {
+  return (
+    Object.keys(objA).length === Object.keys(objB).length &&
+    Object.keys(objA).every(key =>
+      hasOwnProperty(objB, key) && objA[key] === objB[key],
+    )
+  );
+}
+
+export function isUndef(value: unknown): value is undefined {
+  return value === undefined;
+}

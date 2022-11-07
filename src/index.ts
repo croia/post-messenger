@@ -21,7 +21,15 @@ import {
   ValidateOriginFn,
   ValidateRequest,
 } from './types';
-import { ab2str, decodeBase64, encodeBase64, hasOwnProperty, str2ab } from './utils';
+import {
+  ab2str,
+  decodeBase64,
+  encodeBase64,
+  hasOwnProperty,
+  isUndef,
+  shallowCompare,
+  str2ab,
+} from './utils';
 
 const AESCBC = 'AES-CBC';
 
@@ -82,7 +90,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
       return useEncryptionForMessage;
     };
 
-    if (hasOwnProperty(requestNames, InternalRequestKeys.postMessengerConnect)) {
+    if (requestNames && hasOwnProperty(requestNames, InternalRequestKeys.postMessengerConnect)) {
       throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
 
@@ -240,7 +248,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
   /* type safe public request wrapper for #requestNames */
   request<R = unknown>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
-    if (this.connection && this.requestNames && !this.connection.requestNames[String(requestName)]) {
+    if (this.requestNames && this.connection && this.connection.requestNames && !this.connection.requestNames[String(requestName)]) {
       throw new Error(this.prefix(
         `Connected client ${this.connection.clientName} does not have a matching request name for ${String(requestName)} so this request will fail.`,
       ));
@@ -374,28 +382,49 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
 
     this.beginListening(messageOrigin => (origin ? messageOrigin === origin : true));
 
-    return new Promise((resolve) => {
-      const removeResponders = this.#bindResponders({
+    return new Promise((resolve, reject) => {
+      const removeConnectionResponder = this.#bindResponders({
         postMessengerConnect: async (data: ConnectMessage, event): Promise<ConnectionDetails> => {
           if (!event.source) {
-            throw new Error(this.prefix('event.source is null'));
+            reject(new Error(this.prefix('Received connection attempt but event.source is null')));
           }
-
-          this.setTarget(event.source as Window, data.origin);
 
           this.connection = {
             clientName: data.clientName,
             requestNames: data.requestNames,
-            useEncryption: false,
+            useEncryption: data.useEncryption,
           };
+
+          this.setTarget(event.source as Window, data.origin);
+
+          const requestNames = this.requestNames;
+          /* check to make sure both sides agree on requestNames */
+          const providedRequestNamesObjMatch = (
+            !!requestNames &&
+            !!data.requestNames &&
+            shallowCompare(requestNames, data.requestNames)
+          );
+
+          /* either they are both provided and match or both should be undefined: */
+          if (!providedRequestNamesObjMatch && !(isUndef(this.requestNames) && isUndef(data.requestNames))) {
+            reject(new Error(this.prefix('Received connection attempt but requestNames must be the same for both PostMessenger instances')));
+          }
+
+          /* check to make sure both sides agree on useEncryption */
+          const useEncryption = this.useEncryption();
+          if (useEncryption !== data.useEncryption) {
+            reject(new Error(this.prefix('Received connection attempt but useEncryption must be the same for both PostMessenger instances')));
+          }
 
           if (this.useEncryption()) {
             if (!data.iv || !data.jsonRequestKey || !data.useEncryption) {
-              const errorMsg = 'encryption is required but iv or jsonRequestKey or useEncryption were not provided in connection message.';
-              throw new Error(this.prefix(errorMsg));
+              const error = new Error(
+                this.prefix('encryption is required but iv or jsonRequestKey or useEncryption were not provided in connection message.'),
+              );
+              reject(error);
+              throw error;
             }
 
-            this.connection.useEncryption = true;
             this.#encryptionValues.iv = new Uint8Array([...data.iv]);
             this.#encryptionValues.algorithm = { iv: this.#encryptionValues.iv, name: AESCBC };
             this.#encryptionValues.requestKey = await crypto.subtle.importKey(
@@ -408,9 +437,9 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
           }
 
           /* If the page has multiple postMessenger instances to / from same origin there could be
-             a second connect message that overwrites this connection. Once the first connection
-             is confirmed we should stop listening for future connect messages: */
-          removeResponders();
+         a second connect message that overwrites this connection. Once the first connection
+         is confirmed we should stop listening for future connect messages: */
+          removeConnectionResponder();
 
           this.logger(`Accepted connection from ${this.connection.clientName}`, this.connection);
 
