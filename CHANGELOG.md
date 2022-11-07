@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/croia/post-messenger/compare/v1.0.10...v2.0.0) (2022-11-07)
+
+
+### Features
+
+* Make requestNames optional and most methods private ([#62](https://github.com/croia/post-messenger/issues/62)) ([8df03f4](https://github.com/croia/post-messenger/commit/8df03f48e529a0be62d3381c7049f89c85a80a89))
+
+
+### BREAKING CHANGES
+
+* many previously available methods are now private
+
 ## [1.0.10](https://github.com/croia/post-messenger/compare/v1.0.9...v1.0.10) (2022-10-23)
 
 
