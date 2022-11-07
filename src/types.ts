@@ -1,3 +1,4 @@
+import { objectKeyMap } from './utils';
 
 export type ValidateOriginFn = (origin: string) => boolean;
 
@@ -17,7 +18,8 @@ export type Error = {
 /* eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types */
 export const isError = (e: any): e is Error => Boolean(e.message);
 
-export type RequestName<T> = keyof T;
+/* if requestNames object has been provided as T then type must match a key on T, otherwise any string may be provided as the requestName */
+export type RequestName<T> = T extends Record<string, string> ? keyof T : string;
 
 export type Responders<T> = {
   [key in RequestName<T>]?: (data: any, event: WindowEventMap['message']) => Promise<any> | any;
@@ -41,12 +43,11 @@ export const isRequestMessage = <T>(msg: RequestMessage<T>): msg is RequestMessa
   typeof msg.errorMessage !== 'undefined',
 );
 
-export type PostMessengerArgs<T> = {
+export type PostMessengerArgs = {
   clientName: string;
   enableLogging?: boolean;
   useEncryption?: boolean;
   maxResponseTime?: number;
-  requestNames: T;
 };
 
 export type ConnectMessage = {
@@ -83,11 +84,13 @@ export type AcceptConnectionsArgs = {
 export type ConnectionDetails = {
   useEncryption: boolean;
   clientName: string;
-  requestNames: Record<string, string>;
+  requestNames: Record<string, string> | undefined;
 };
 
 export enum InternalRequestNames {
   postMessengerConnect = 'post-messenger-connect',
 }
+
+export const InternalRequestKeys = objectKeyMap(InternalRequestNames);
 
 export type ValidateRequest = (data: any) => boolean;

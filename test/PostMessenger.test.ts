@@ -61,16 +61,17 @@ function buildWindowRef(): WindowRef {
   return windowRef;
 }
 
-async function beginListeningWithMock(postMessengerInstance: PostMessenger<typeof RequestNames>): Promise<WindowRef> {
-  return new Promise((resolve) => {
-    const windowRef = buildWindowRef();
-    postMessengerInstance.beginListening(() => true);
-    resolve(windowRef);
-  });
+function getConnectionDetails(extraProps?: Partial<ConnectionDetails>): ConnectionDetails {
+  return {
+    clientName: 'iframe-client',
+    requestNames: undefined,
+    useEncryption: false,
+    ...extraProps,
+  };
 }
 
 async function connectWithMock(
-  postMessengerInstance: PostMessenger<typeof RequestNames>,
+  postMessengerInstance: PostMessenger<typeof RequestNames | undefined>,
   targetWindow: Window,
   targetOrigin: string,
   connectResponse: ConnectionDetails,
@@ -108,7 +109,7 @@ async function connectWithMock(
   }
 
   await connectPromise;
-  
+
   return windowRef;
 }
 
@@ -122,10 +123,7 @@ describe('PostMessenger', () => {
 
   describe('constructor', () => {
     test('should construct PostMessenger properly and not expose private properties', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-      });
+      const postMessenger = new PostMessenger({ clientName }, RequestNames);
       expect(postMessenger.clientName).toEqual(clientName);
       expect(postMessenger.maxResponseTime).toBeDefined();
 
@@ -137,10 +135,10 @@ describe('PostMessenger', () => {
 
     test('should prevent reserved request names from being used', async () => {
       expect(() => {
-        new PostMessenger({
-          clientName,
-          requestNames: { postMessengerConnect: 'post-messenger-connect' },
-        });
+        new PostMessenger(
+          { clientName },
+          { postMessengerConnect: 'post-messenger-connect' },
+        );
       }).toThrow(/.*reserved.*request.*/gi);
     });
   });
@@ -150,13 +148,12 @@ describe('PostMessenger', () => {
       const postMessenger = new PostMessenger({
         clientName,
         enableLogging: false,
-        requestNames: RequestNames,
-      });
+      }, RequestNames);
 
       const consoleLogMock = jest.spyOn(console, 'log');
       const consoleWarnMock = jest.spyOn(console, 'warn');
       const consoleErrorMock = jest.spyOn(console, 'error');
-      
+
       postMessenger.logger('sjkdfkjd');
       expect(consoleLogMock).not.toHaveBeenCalled();
       expect(consoleWarnMock).not.toHaveBeenCalled();
@@ -167,23 +164,19 @@ describe('PostMessenger', () => {
       const postMessenger = new PostMessenger({
         clientName,
         enableLogging: true,
-        requestNames: RequestNames,
-      });
+      }, RequestNames);
 
       const consoleLogMock = jest.spyOn(console, 'log');
-      
-      postMessenger.logger('sjkdfkjd');
+
+      postMessenger.logger('should log when enableLogging is true');
       expect(consoleLogMock).toHaveBeenCalled();
     });
   });
 
   describe('addListener and removeListener', () => {
     test('should add and remove listeners successfully', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-      });
-      const listener = () => {};
+      const postMessenger = new PostMessenger({ clientName }, RequestNames);
+      const listener = () => { };
       const removeListener = postMessenger.addListener(RequestNames.one, listener);
       let listeners = postMessenger.getListeners();
       expect(Object.keys(listeners)).toHaveLength(1);
@@ -197,143 +190,159 @@ describe('PostMessenger', () => {
   });
 
   describe('request', () => {
+    let iframeWindow: Window;
+    let postMessenger: PostMessenger;
+    let windowRef: WindowRef;
+    let postMessageSpy: jest.SpyInstance<void, [message: any, options?: WindowPostMessageOptions | undefined]>;
+
+    const defaultConnectionDetails = getConnectionDetails();
+    const requestName = 'test:request';
+    const responseData = { resProp: true };
+
+    beforeEach(async () => {
+      iframeWindow = appendIFrameAndGetWindow();
+      postMessenger = new PostMessenger({ clientName, useEncryption: false });
+      windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails);
+      postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
+    });
+
     afterEach(() => {
       jest.clearAllMocks();
     });
 
-    test('should throw an error if messageKey does not exist on request names', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-      });
-      expect(() => {
-        // @ts-expect-error: test for non ts consumers
-        postMessenger.request('message:two', {});
-      }).toThrow();
-    });
-
-    test('should send request messages and respond to request messages properly after beginListening is called', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-        useEncryption: false,
-      });
-
-      const iframeWindow = appendIFrameAndGetWindow();
-      postMessenger.setTarget(iframeWindow, targetOrigin);
-      const windowRef = await beginListeningWithMock(postMessenger);
-      const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
+    test('should send request messages and respond to requests properly after connection', async () => {
       postMessageSpy.mockImplementation(async (message) => {
-        await sleep(0); // move to bottom of stack since addListener from beginListening above is added async
+        await sleep(0); // move to bottom of stack since addListener from connectWithMock above is added async
         windowRef.sendMessage(buildMessageEvent({
           data: {
-            data: { resProp: true },
+            data: responseData,
             errorMessage: null,
             isError: false,
             requestId: message.requestId,
-            requestName: RequestNames.one,
+            requestName,
           },
           origin: targetOrigin,
         }));
       });
-      const response = await postMessenger.request(RequestNameKeys.one, {});
+      const response = await postMessenger.request<typeof responseData>(requestName, {});
       expect(response.resProp).toEqual(true);
     });
 
     test('should throw if request returns a request message indicating an error occurred', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-        useEncryption: false,
-      });
-
-      const iframeWindow = appendIFrameAndGetWindow();
-      postMessenger.setTarget(iframeWindow, targetOrigin);
-      const windowRef = await beginListeningWithMock(postMessenger);
       const errorMessage = 'Some more specific error message';
-      const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       postMessageSpy.mockImplementation(async (message) => {
-        await sleep(0);
+        await sleep(0); // move to bottom of stack since addListener from beginListening above is added async
         windowRef.sendMessage(buildMessageEvent({
           data: {
-            data: { resProp: true },
+            data: responseData,
             errorMessage,
             isError: true,
             requestId: message.requestId,
-            requestName: RequestNames.one,
+            requestName,
           },
+          origin: targetOrigin,
         }));
       });
       await expect(async () => {
-        await postMessenger.request(RequestNameKeys.one, {});
+        await postMessenger.request(requestName, {});
       }).rejects.toThrow(new RegExp(`.*${errorMessage}.*`, 'gi'));
     });
 
     test('should not accept and timeout for a received request message with a non matching requestId', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-        useEncryption: false,
-      });
-
-      const iframeWindow = appendIFrameAndGetWindow();
-      postMessenger.setTarget(iframeWindow, targetOrigin);
-      const windowRef = await beginListeningWithMock(postMessenger);
-      const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
       postMessageSpy.mockImplementation(async () => {
         await sleep(0);
         windowRef.sendMessage(buildMessageEvent({
           data: {
-            data: { resProp: true },
+            data: responseData,
             errorMessage: null,
             isError: false,
             requestId: 'the-wrong-request-id',
-            requestName: RequestNames.one,
+            requestName: requestName,
           },
         }));
       });
       await expect(async () => {
-        await postMessenger.request(RequestNameKeys.one, {}, { maxResponseTime: 100 });
+        await postMessenger.request(requestName, {}, { maxResponseTime: 100 });
       }).rejects.toThrow(new RegExp('.*time out.*', 'gi'));
     });
 
     test('should throw for non existing connection when encryption is true', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
-        useEncryption: true,
+      const pm = new PostMessenger({ clientName, useEncryption: true });
+      await expect(async () => {
+        await pm.request(requestName, {});
+      }).rejects.toThrow(new RegExp('.*no connected client.*', 'gi'));
+    });
+
+    test('should throw an error if messageKey does not exist on request names when requestNames are provided', async () => {
+      const pm = new PostMessenger({ clientName }, RequestNames);
+
+      expect(() => {
+        // @ts-expect-error: 'two' is not on requestNames so this should be a type error:
+        pm.request('two', {});
+      }).toThrow(/.*requestNames were provided to constructor but unable to find requestName for two.*/);
+    });
+
+    test('should allow any request name by default if requestNames not provided', async () => {
+      const pm = new PostMessenger({ clientName });
+      windowRef = await connectWithMock(pm, iframeWindow, targetOrigin, defaultConnectionDetails);
+
+      postMessageSpy.mockImplementation(async (message) => {
+        await sleep(0); // move to bottom of stack since addListener from connectWithMock above is added async
+        windowRef.sendMessage(buildMessageEvent({
+          data: {
+            data: 'sdf',
+            errorMessage: null,
+            isError: false,
+            requestId: message.requestId,
+            requestName: 'two',
+          },
+          origin: targetOrigin,
+        }));
       });
 
-      const iframeWindow = appendIFrameAndGetWindow();
-      postMessenger.setTarget(iframeWindow, targetOrigin);
-      await beginListeningWithMock(postMessenger);
-      await expect(async () => {
-        await postMessenger.request(RequestNameKeys.one, {});
-      }).rejects.toThrow(new RegExp('.*no connected client.*', 'gi'));
+      /* note there is no type error here when requestNames is not provided.
+         see test above for opposite case which verifies that a type error is thrown */
+      await expect(await pm.request('two', {})).toEqual(JSON.parse(textDecoderResponse));
     });
   });
 
   describe('connect with encryption', () => {
+    let iframeWindow: Window;
     let postMessenger: PostMessenger<typeof RequestNames>;
-    let iframeWindow;
-    beforeEach(() => {
-      postMessenger = new PostMessenger({
-        clientName,
-        requestNames: RequestNames,
+    let postMessageSpy: jest.SpyInstance<void, [message: any, options?: WindowPostMessageOptions | undefined]>;
+
+    const defaultConnectionDetails = getConnectionDetails({ requestNames: RequestNames, useEncryption: true });
+
+    function buildConnectMessage(origin: string = targetOrigin, messageData?, extraData?) {
+      return buildMessageEvent({
+        data: {
+          data: {
+            iv: window.crypto.getRandomValues(new Uint8Array(16)),
+            jsonRequestKey: exportedKey,
+            origin: 'https://any-origin-should-work.com',
+            ...defaultConnectionDetails,
+            ...messageData,
+          },
+          errorMessage: null,
+          isError: false,
+          requestId: '2342552',
+          requestName: InternalRequestNames.postMessengerConnect,
+          ...extraData,
+        },
+        origin,
       });
+    }
+
+    beforeEach(async () => {
       iframeWindow = appendIFrameAndGetWindow();
+      postMessenger = new PostMessenger({ clientName }, RequestNames);
+      postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
     });
 
-    const connectionResponse = {
-      clientName: 'iframe-client',
-      requestNames: RequestNames,
-      useEncryption: true,
-    };
-    
     window.TextEncoder = TextEncoder;
     window.TextDecoder = TextDecoder;
 
-    test('should throw an error immediately if connected client does not have matching request name', async () => {
+    test('should throw an error immediately if connected client does not have matching request name when requestNames are provided', async () => {
       await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
         clientName: 'iframe-client',
         requestNames: {},
@@ -341,27 +350,27 @@ describe('PostMessenger', () => {
       });
       await expect(async () => {
         await postMessenger.request(RequestNameKeys.one, {});
-      }).rejects.toThrow(/.*does not have a matching request name.*/gi);
+      }).rejects.toThrow(/.*does not have a matching request name*/gi);
     });
 
     test('should connect successfully', async () => {
-      await connectWithMock(postMessenger, iframeWindow, targetOrigin, connectionResponse);
-      expect(postMessenger.connection).toEqual(connectionResponse);
+      await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails);
+      expect(postMessenger.connection).toEqual(defaultConnectionDetails);
     });
 
     test('should connect successfully after multiple retries', async () => {
-      await connectWithMock(postMessenger, iframeWindow, targetOrigin, connectionResponse, 3000);
-      expect(postMessenger.connection).toEqual(connectionResponse);
+      await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails, 3000);
+      expect(postMessenger.connection).toEqual(defaultConnectionDetails);
     });
 
     test('should throw for non string request responses', async () => {
-      const windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, connectionResponse);
-      const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
+      const windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails);
+      const nonStringResponseData = { resProp: 'something' };
       postMessageSpy.mockImplementation(async (message: any) => {
         await sleep(0); // move to bottom of stack since addListener from connect above is added async
         windowRef.sendMessage(buildMessageEvent({
           data: {
-            data: { resProp: true },
+            data: nonStringResponseData,
             errorMessage: null,
             isError: false,
             requestId: message.requestId,
@@ -377,8 +386,7 @@ describe('PostMessenger', () => {
     });
 
     test('should encrypt request messages', async () => {
-      const windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, connectionResponse);
-      const postMessageSpy = jest.spyOn(iframeWindow, 'postMessage');
+      const windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails);
       postMessageSpy.mockImplementation(async (message: any) => {
         await sleep(0); // move to bottom of stack since addListener from connect above is added async
         windowRef.sendMessage(buildMessageEvent({
@@ -400,30 +408,13 @@ describe('PostMessenger', () => {
 
     test('should accept connections', async () => {
       const windowRef = buildWindowRef();
-      postMessenger.acceptConnections({ allowAnyOrigin: true });
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
       await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
-      windowRef.sendMessage(buildMessageEvent({
-        data: {
-          data: {
-            clientName: 'iframe-client',
-            iv: window.crypto.getRandomValues(new Uint8Array(16)),
-            jsonRequestKey: exportedKey,
-            origin: 'https://any-origin-should-work.com',
-            requestNames: RequestNames,
-            useEncryption: true,
-          },
-          errorMessage: null,
-          isError: false,
-          requestId: '2342552',
-          requestName: InternalRequestNames.postMessengerConnect,
-        },
-      }));
-      expect(postMessenger.connection).toEqual({
-        clientName: 'iframe-client',
-        requestNames: RequestNames,
-        useEncryption: true,
-      });
+      windowRef.sendMessage(buildConnectMessage());
+
+      const connectionResponse = await pendingConnection;
+      expect(connectionResponse).toEqual(defaultConnectionDetails);
     });
 
     test('should accept connections and resolve with connection details when connecting client takes a while', async () => {
@@ -432,29 +423,34 @@ describe('PostMessenger', () => {
       await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
       setTimeout(() => {
-        windowRef.sendMessage(buildMessageEvent({
-          data: {
-            data: {
-              clientName: 'iframe-client',
-              iv: window.crypto.getRandomValues(new Uint8Array(16)),
-              jsonRequestKey: exportedKey,
-              origin: 'https://any-origin-should-work.com',
-              requestNames: RequestNames,
-              useEncryption: true,
-            },
-            errorMessage: null,
-            isError: false,
-            requestId: '2342552',
-            requestName: InternalRequestNames.postMessengerConnect,
-          },
-        }));
+        windowRef.sendMessage(buildConnectMessage());
       }, 1000);
-      const connectionDetails = await pendingConnection;
-      expect(connectionDetails).toEqual({
-        clientName: 'iframe-client',
-        requestNames: RequestNames,
-        useEncryption: true,
-      });
+
+      const connectionResponse = await pendingConnection;
+      expect(connectionResponse).toEqual(defaultConnectionDetails);
+    });
+
+    test('should throw an error when useEncryption does not match between clients', async () => {
+      const windowRef = buildWindowRef();
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
+      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
+      windowRef.sendMessage(buildConnectMessage(targetOrigin, { useEncryption: false }));
+      await expect(async () => {
+        await pendingConnection;
+      }).rejects.toThrow(/.*useEncryption must be the same for both PostMessenger instances*/gi);
+    });
+
+    test('should throw an error when requestNames does not match between clients', async () => {
+      const windowRef = buildWindowRef();
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
+      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
+      windowRef.sendMessage(buildConnectMessage(
+        targetOrigin,
+        { requestNames: undefined, useEncryption: false },
+      ));
+      await expect(async () => {
+        await pendingConnection;
+      }).rejects.toThrow(/.*requestNames must be the same for both PostMessenger instances*/gi);
     });
 
     test('should throw an error when allowAnyOrigin is not true with no origin specified', async () => {
@@ -466,87 +462,43 @@ describe('PostMessenger', () => {
     test('should accept connections from trusted origin only when specified', async () => {
       const windowRef = buildWindowRef();
       const trustedOrigin = 'https://only-this-origin.com';
-      postMessenger.acceptConnections({ allowAnyOrigin: false, origin: trustedOrigin });
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: false, origin: trustedOrigin });
       await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
-      windowRef.sendMessage(buildMessageEvent({
-        data: {
-          data: {
-            clientName: 'iframe-client',
-            iv: window.crypto.getRandomValues(new Uint8Array(16)),
-            jsonRequestKey: exportedKey,
-            origin: 'https://any-origin-should-work.com',
-            requestNames: RequestNames,
-            useEncryption: true,
-          },
-          errorMessage: null,
-          isError: false,
-          requestId: '2342552',
-          requestName: InternalRequestNames.postMessengerConnect,
-        },
-        origin: trustedOrigin,
-      }));
-      expect(postMessenger.connection).toEqual({
-        clientName: 'iframe-client',
-        requestNames: RequestNames,
-        useEncryption: true,
-      });
+      windowRef.sendMessage(buildConnectMessage(trustedOrigin));
+
+      const connectionResponse = await pendingConnection;
+      expect(connectionResponse).toEqual(defaultConnectionDetails);
     });
 
     test('should fail to connect when received message is not from trusted origin', async () => {
       const windowRef = buildWindowRef();
       const trustedOrigin = 'https://only-this-origin.com';
-      postMessenger.acceptConnections({ allowAnyOrigin: false, origin: trustedOrigin });
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: false, origin: trustedOrigin });
       await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
       expect(postMessenger.connection).toEqual(null);
-      windowRef.sendMessage(buildMessageEvent({
-        data: {
-          data: {
-            clientName: 'iframe-client',
-            iv: window.crypto.getRandomValues(new Uint8Array(16)),
-            jsonRequestKey: exportedKey,
-            origin: 'https://any-origin-should-work.com',
-            requestNames: RequestNames,
-            useEncryption: true,
-          },
-          errorMessage: null,
-          isError: false,
-          requestId: '2342552',
-          requestName: InternalRequestNames.postMessengerConnect,
-        },
-        origin: 'https://google.com',
-      }));
+      windowRef.sendMessage(buildConnectMessage('https://google.com'));
+      await Promise.race([
+        pendingConnection, // should not resolve due to invalid connect attempt above
+        new Promise(resolve => setTimeout(resolve, 50)),
+      ]);
       expect(postMessenger.connection).toEqual(null);
     });
 
     test('should bind responder and be called when corresponding message is recieved', async () => {
       const windowRef = buildWindowRef();
-      postMessenger.acceptConnections({ allowAnyOrigin: true });
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
       await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
 
       expect(postMessenger.connection).toEqual(null); // no connection should exist yet
       // simulate connection message from a root page client to this client:
-      windowRef.sendMessage(buildMessageEvent({
-        data: {
-          data: {
-            clientName: 'root-client',
-            iv: window.crypto.getRandomValues(new Uint8Array(16)),
-            jsonRequestKey: exportedKey,
-            origin: 'https://any-origin-should-work.com',
-            requestNames: RequestNames,
-            useEncryption: true,
-          },
-          errorMessage: null,
-          isError: false,
-          requestId: '2342552',
-          requestName: InternalRequestNames.postMessengerConnect,
-        },
-      }));
+      windowRef.sendMessage(buildConnectMessage(targetOrigin, { clientName: 'root-client' }));
+
+      const connectionResponse = await pendingConnection;
       // verify connection received:
-      expect(postMessenger.connection).toEqual({
+      expect(connectionResponse).toEqual({
+        ...defaultConnectionDetails,
         clientName: 'root-client',
-        requestNames: RequestNames,
-        useEncryption: true,
       });
 
       const mockResponder = jest.fn();
@@ -567,14 +519,63 @@ describe('PostMessenger', () => {
     });
   });
 
+  describe('connect without encryption', () => {
+    let iframeWindow;
+    beforeEach(() => {
+      iframeWindow = appendIFrameAndGetWindow();
+    });
+
+    const defaultConnectionDetails = getConnectionDetails({ requestNames: {} });
+
+    test('should connect successfully', async () => {
+      const postMessenger = new PostMessenger({ clientName, useEncryption: false });
+      await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails);
+      expect(postMessenger.connection).toEqual(defaultConnectionDetails);
+    });
+
+    test('should connect successfully after multiple retries', async () => {
+      const postMessenger = new PostMessenger({ clientName, useEncryption: false });
+      await connectWithMock(postMessenger, iframeWindow, targetOrigin, defaultConnectionDetails, 3000);
+      expect(postMessenger.connection).toEqual(defaultConnectionDetails);
+    });
+
+    test('should accept connections', async () => {
+      const postMessenger = new PostMessenger({ clientName, useEncryption: false });
+      const windowRef = buildWindowRef();
+      const pendingConnection = postMessenger.acceptConnections({ allowAnyOrigin: true });
+      await sleep(0); // move to bottom of stack since addListener from acceptConnections above is added async
+      expect(postMessenger.connection).toEqual(null);
+      windowRef.sendMessage(buildMessageEvent({
+        data: {
+          data: {
+            clientName: 'iframe-client',
+            origin: 'https://any-origin-should-work.com',
+            requestNames: undefined,
+            useEncryption: false,
+          },
+          errorMessage: null,
+          isError: false,
+          requestId: '2342552',
+          requestName: InternalRequestNames.postMessengerConnect,
+        },
+      }));
+
+      const connectionResponse = await pendingConnection;
+      expect(connectionResponse).toEqual({
+        clientName: 'iframe-client',
+        requestNames: undefined,
+        useEncryption: false,
+      });
+    });
+  });
+
   describe('bindResponders', () => {
     let postMessenger: PostMessenger<typeof RequestNames>;
     beforeEach(() => {
       postMessenger = new PostMessenger({
         clientName,
-        requestNames: RequestNames,
         useEncryption: false,
-      });
+      }, RequestNames);
     });
 
     test('should fail if a reserved request responder is provided', () => {
@@ -587,9 +588,9 @@ describe('PostMessenger', () => {
     test('should bind responder and be called when corresponding message is recieved', async () => {
       const mockResponder = jest.fn();
       const iframeWindow = appendIFrameAndGetWindow();
-      postMessenger.setTarget(iframeWindow, targetOrigin);
-      const windowRef = await beginListeningWithMock(postMessenger);
+      const windowRef = await connectWithMock(postMessenger, iframeWindow, targetOrigin, getConnectionDetails());
       postMessenger.bindResponders({ [RequestNameKeys.one]: mockResponder });
+
       const data = { resProp: true };
       const messageEvent = buildMessageEvent({
         data: {
@@ -599,6 +600,7 @@ describe('PostMessenger', () => {
           requestId: '23423425',
           requestName: RequestNames.one,
         },
+        origin: targetOrigin,
       });
       windowRef.sendMessage(messageEvent);
       expect(mockResponder).toHaveBeenCalledWith(data, messageEvent);

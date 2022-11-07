@@ -1,6 +1,6 @@
 # PostMessenger
 
-`window.postMessage` is used to send messages between window objects but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage.
+`window.postMessage` is used to send messages between window objects but receiving a response or acknowledgment is not built in. PostMessenger connects window objects and wraps `window.postMessage` messages in promises to make communication between windows easier to manage. 5KB zipped.
 
 ## Install
 
@@ -10,53 +10,23 @@ npm i @croia/post-messenger
 
 ## Example Usage
 
-Since this library is just a wrapper, PostMessenger should work between any two windows objects that postMessage supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts on both windows. From the root page window:
+Since this library is just a wrapper, PostMessenger should work between any two windows objects that postMessage supports. As an example we will assume you are trying to connect a root page window and an iframe loaded there. The easiest way to get started is to connect the two windows by instantiating PostMessenger in scripts in each window. From the root page window:
 
 ```javascript
 import { PostMessenger } from '@croia/post-messenger';
 
-// Create and append the iframe to communicate with:
-const iframeSrc = 'https://some.app';
-const iframe = document.createElement('iframe');
-iframe.src = iframeSrc;
-document.body.appendChild(iframe);
-
-const postMessenger = new PostMessenger({
-  requestNames: {
-    // These are just some example request names, call yours whatever you'd like.
-    initializeIFrame: 'mainApp:initializeIFrame',
-    requestDataFromRootWindow: 'mainApp:requestDataFromRootWindow',
-    asyncRequestFromRootWindow: 'mainApp:asyncRequestFromRootWindow',
-  },
-  enableLogging: true,
-  // Help identify this instance in the logs with a name:
-  clientName: 'parent-client',
-});
-
-// Functions to run after receiving a request from the connected window with a matching requestName key
-postMessenger.bindResponders({
-  requestDataFromRootWindow: ({ someParam }) => {
-    // You can return data back to the other window but it should be JSON serializable
-    return someParam + 1;
-  },
-  // Return a promise and PostMessenger will await it for you and return any errors to the other window
-  asyncRequestFromRootWindow: async ({ someValue }) => {
-    const result = await makeAnAsyncRequest(someValue);
-    return result;
-  }
-});
+const postMessenger = new PostMessenger();
 
 // Wait for connection from the iframe:
-await postMessenger.acceptConnections({ origin: iframeSrc });
+await postMessenger.acceptConnections({ origin: 'https://iframe-src.app' });
 
 // Now that we are connected we can send and await requests to the iframe
 const response = await postMessenger.request(
-  postMessenger.requestNames.initializeIFrame,
-  // include any data you'd like but it will need to be JSON serializable:
-  { someMessage: '1234' },
-);
-
-console.log({ response }); // { response: true } (iframe responder returns true, see example below)
+  // name of some request that the iframe should respond to:
+  'initializeApp',
+  // send JSON serializable data:
+  { someMessage: 1234 },
+); // returns 'app-initialized' (see iframe responder below)
 ```
 
 From the iframe:
@@ -64,21 +34,14 @@ From the iframe:
 ```javascript
 import { PostMessenger } from '@croia/post-messenger';
 
-const postMessenger = new PostMessenger({
-  types: {
-    initializeIFrame: 'mainApp:initializeTheApp',
-    requestDataFromRootWindow: 'mainApp:requestDataFromRootWindow',
-    asyncRequestFromRootWindow: 'mainApp:asyncRequestFromRootWindow',
-  },
-  enableLogging: true,
-  clientName: 'child-client',
-});
+const postMessenger = new PostMessenger();
 
+// Functions to run after receiving a request from the connected window with a matching requestName
 postMessenger.bindResponders({
-  initializeIFrame: ({ someMessage }) => {
+  initializeApp: ({ someMessage }) => {
     console.log({ someMessage }); // { someMessage: '1234' }
-    return true;
-  }
+    return 'app-initialized';
+  },
 });
 
 // Initialize connection with the root window
@@ -87,13 +50,70 @@ await postMessenger.connect({
   // The root window is the iframe parent, window.parent
   targetWindow: window.parent,
 });
+```
 
-// Now that we are connected we can send and await requests to the root window
-const response = await postMessenger.request(
-  postMessenger.requestNames.requestDataFromRootWindow, 3,
-);
+Either window can send and await requests to the other. To send requests from the iframe to the root window simply bindResponders in the root window as well:
 
-console.log({ response }); // { response: 4 }
+```javascript
+postMessenger.bindResponders({
+  requestSomeDataFromRootWindow: () => {
+    // You can return data back to the other window but it should be JSON serializable
+    return 5;
+  },
+  // Responders can return a promise and PostMessenger will await it for you and return any errors to the other window
+  runSomeAsyncProcess: async ({ someValue }) => {
+    const result = await someAsyncProcess(someValue);
+    return 'done';
+  },
+});
+
+// Wait for connection from the iframe:
+await postMessenger.acceptConnections({ origin: 'https://iframe-src.app' });
+```
+
+and then request from the iframe:
+
+```javascript
+// Initialize connection with the root window
+await postMessenger.connect({
+  targetOrigin: 'https://root-page.app',
+  // The root window is the iframe parent, window.parent
+  targetWindow: window.parent,
+});
+
+const requestOne = await postMessenger.request('requestSomeDataFromRootWindow'); // 5
+const requestTwo = await postMessager.request('runSomeAsyncProcess', { someValue }) // 'done'
+```
+
+Turn on enableLogging in both PostMessenger instances to see requests logged to the console
+
+```javascript
+const postMessenger = new PostMessenger({
+  enableLogging: true,
+  clientName: 'iframe-client',
+});
+```
+
+If you're using TypeScript, providing the `requestNames` option to the constructor is recommended. The type is used to validate that the requestNames provided to `bindResponders` and `request` exist on the `requestNames` you provided. Runtime validation is also performed on requestNames if provided, which may still be useful if you're not using TypeScript:
+
+```javascript
+enum RequestNames {
+  initializeApp = 'initializeApp',
+  requestDataFromRootWindow = 'requestDataFromRootWindow',
+}
+
+let postMessenger: PostMessenger<typeof RequestNames>;
+
+const postMessenger = new PostMessenger({ requestNames: RequestNames });
+
+// Wait for connection from the iframe:
+await postMessenger.acceptConnections({ origin: 'https://iframe-src.app' });
+
+// This requestName exists on RequestNames so the TypeScript compile passes:
+await postMessenger.request(postMessenger.requestNames.initializeApp, { someMessage: 1234 });
+
+// This requestName is not on RequestNames so TypeScript throws an error:
+await postMessenger.request('someOtherRequest', { someMessage: 1234 });
 ```
 
 ## PostMessenger constructor options

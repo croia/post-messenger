@@ -7,6 +7,7 @@ import {
   ConnectMessage,
   EncryptionValues,
   InternalRequestNames,
+  InternalRequestKeys,
   isError,
   isRequestMessage,
   Listener,
@@ -20,11 +21,11 @@ import {
   ValidateOriginFn,
   ValidateRequest,
 } from './types';
-import { ab2str, decodeBase64, encodeBase64, str2ab } from './utils';
+import { ab2str, decodeBase64, encodeBase64, hasOwnProperty, isUndef, shallowCompare, str2ab } from './utils';
 
 const AESCBC = 'AES-CBC';
 
-class PostMessenger<T extends Record<string, string>> {
+class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   /* prefixed to messages and log messages to help distinguish sending/receiving side */
   clientName: string;
 
@@ -52,17 +53,19 @@ class PostMessenger<T extends Record<string, string>> {
   targetOrigin: string | null = null;
 
   /* message names to keys representing sent and expected received request names */
-  #requestNames: T & typeof InternalRequestNames;
+  #requestNames: T | undefined;
 
   #validateOrigin: ValidateOriginFn | null = null;
 
-  constructor({
-    clientName = 'unknown',
-    enableLogging = false,
-    useEncryption = true,
-    maxResponseTime = 10000,
-    requestNames,
-  }: PostMessengerArgs<T>) {
+  constructor(
+    {
+      clientName = 'unknown',
+      enableLogging = false,
+      useEncryption = true,
+      maxResponseTime = 10000,
+    }: PostMessengerArgs,
+    requestNames?: T,
+  ) {
     autoBind(this);
     this.clientName = clientName;
     this.#enableLogging = enableLogging;
@@ -78,16 +81,17 @@ class PostMessenger<T extends Record<string, string>> {
       }
       return useEncryptionForMessage;
     };
-    this.maxResponseTime = maxResponseTime;
 
-    if (requestNames.postMessengerConnect) {
-      throw new Error(this.prefix('postMessengerConnect is a reserved request name.'));
+    if (requestNames && hasOwnProperty(requestNames, InternalRequestKeys.postMessengerConnect)) {
+      throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
 
-    this.#requestNames = {
-      ...requestNames,
-      ...InternalRequestNames,
-    };
+    this.maxResponseTime = maxResponseTime;
+    this.#requestNames = requestNames;
+  }
+
+  get requestNames(): T {
+    return this.#requestNames as T;
   }
 
   prefix(str: string): string {
@@ -168,7 +172,7 @@ class PostMessenger<T extends Record<string, string>> {
   }
 
   /* Sends a message and listens for a response matching a unique message id. */
-  async #request<R = any>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+  async #request<R = unknown>(requestName: string, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
     const requestId = uuidv4();
     this.logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
     await this.#sendRequestMessage(requestName, requestId, data);
@@ -216,28 +220,38 @@ class PostMessenger<T extends Record<string, string>> {
     });
   }
 
-  /* type safe public request wrapper for #requestNames */
-  request<R = any>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
-    const matchingRequestName = this.#requestNames[requestName];
-    if (!matchingRequestName) {
-      throw new Error(this.prefix(`Unable to find requestName for ${String(requestName)}`));
+  /* validate requestName exists if optional requestNames are provided to constructor */
+  getRequestName(requestName: string): string {
+    if (InternalRequestNames[requestName]) {
+      return InternalRequestNames[requestName];
     }
 
-    if (this.connection && !this.connection.requestNames[String(requestName)]) {
+    if (this.requestNames) {
+      if (!this.requestNames[requestName]) {
+        throw new Error(this.prefix(`requestNames were provided to constructor but unable to find requestName for ${String(requestName)}`));
+      }
+      return this.requestNames[requestName];
+    }
+    return requestName;
+  }
+
+  /* type safe public request wrapper for #requestNames */
+  request<R = unknown>(requestName: RequestName<T>, data: unknown = {}, options: RequestOptions = {}): Promise<R> {
+    if (this.requestNames && this.connection && this.connection.requestNames && !this.connection.requestNames[String(requestName)]) {
       throw new Error(this.prefix(
         `Connected client ${this.connection.clientName} does not have a matching request name for ${String(requestName)} so this request will fail.`,
       ));
     }
-    return this.#request<R>(matchingRequestName, data, options);
+    return this.#request<R>(this.getRequestName(requestName), data, options);
   }
 
   /* Accepts an object of event requestNames mapping to handlers that return promises.
      Adds listeners that expect messages sent by the request function above in
      order to return a corresponding requestId */
-  #bindResponders(responders: Responders<T>, validateRequest: ValidateRequest | null = null): RemoveAllResponders {
+  #bindResponders(responders: Responders<T> | Responders<InternalRequestNames>, validateRequest: ValidateRequest | null = null): RemoveAllResponders {
     const allRemoveFns: RemoveListener[] = [];
     Object.entries(responders).forEach(([messageName, handler]) => {
-      const requestName = this.#requestNames[messageName];
+      const requestName = this.getRequestName(messageName);
       const removeListenerFn = this.addListener(requestName, async (message, event: WindowEventMap['message']): Promise<void> => {
         if (!isRequestMessage(message) || !handler) {
           return;
@@ -276,8 +290,8 @@ class PostMessenger<T extends Record<string, string>> {
   }
 
   bindResponders(responders: Responders<T>): RemoveAllResponders {
-    if (responders.postMessengerConnect) {
-      throw new Error(this.prefix('postMessengerConnect is a reserved request name.'));
+    if (hasOwnProperty(responders, InternalRequestKeys.postMessengerConnect)) {
+      throw new Error(this.prefix(`${InternalRequestKeys.postMessengerConnect} is a reserved request name.`));
     }
     return this.#bindResponders(responders);
   }
@@ -295,17 +309,17 @@ class PostMessenger<T extends Record<string, string>> {
     if (useEncryption) {
       iv = crypto.getRandomValues(new Uint8Array(16));
       /* encryption code based examples https://bit.ly/3ex4DiQ and https://ibm.co/30ABCdZ */
-    
+
       this.#encryptionValues.requestKey = await crypto.subtle.generateKey(
         { length: 256, name: AESCBC }, // AES in CBC mode, with a key length of 256 bits.
         true, // Allow extracting the key material
         ['encrypt', 'decrypt'], // Restrict usage of the key
       );
       jsonRequestKey = await crypto.subtle.exportKey('jwk', this.#encryptionValues.requestKey);
-    
+
       // AES-CBC requires a 128-bit initialization vector (iv).
       this.#encryptionValues.iv = iv;
-    
+
       // The algorithm is still AES-CBC. The 128-bit iv must be specified.
       this.#encryptionValues.algorithm = { iv, name: AESCBC };
     }
@@ -320,7 +334,7 @@ class PostMessenger<T extends Record<string, string>> {
           iv,
           jsonRequestKey,
           origin: window.location.origin,
-          requestNames: this.#requestNames,
+          requestNames: this.requestNames,
           useEncryption,
         }, { maxResponseTime });
       } catch (e) { /* ignore */ }
@@ -357,28 +371,49 @@ class PostMessenger<T extends Record<string, string>> {
 
     this.beginListening(messageOrigin => (origin ? messageOrigin === origin : true));
 
-    return new Promise((resolve) => {
-      const removeResponders = this.#bindResponders({
+    return new Promise((resolve, reject) => {
+      const removeConnectionResponder = this.#bindResponders({
         postMessengerConnect: async (data: ConnectMessage, event): Promise<ConnectionDetails> => {
           if (!event.source) {
-            throw new Error(this.prefix('event.source is null'));
+            reject(new Error(this.prefix('Received connection attempt but event.source is null')));
           }
-
-          this.setTarget(event.source as Window, data.origin);
 
           this.connection = {
             clientName: data.clientName,
             requestNames: data.requestNames,
-            useEncryption: false,
+            useEncryption: data.useEncryption,
           };
-  
+
+          this.setTarget(event.source as Window, data.origin);
+
+          const requestNames = this.requestNames;
+          /* check to make sure both sides agree on requestNames */
+          const providedRequestNamesObjMatch = (
+            !!requestNames &&
+            !!data.requestNames &&
+            shallowCompare(requestNames, data.requestNames)
+          );
+
+          /* either they are both provided and match or both should be undefined: */
+          if (!providedRequestNamesObjMatch && !(isUndef(this.requestNames) && isUndef(data.requestNames))) {
+            reject(new Error(this.prefix('Received connection attempt but requestNames must be the same for both PostMessenger instances')));
+          }
+
+          /* check to make sure both sides agree on useEncryption */
+          const useEncryption = this.useEncryption();
+          if (useEncryption !== data.useEncryption) {
+            reject(new Error(this.prefix('Received connection attempt but useEncryption must be the same for both PostMessenger instances')));
+          }
+
           if (this.useEncryption()) {
             if (!data.iv || !data.jsonRequestKey || !data.useEncryption) {
-              const errorMsg = 'encryption is required but iv or jsonRequestKey or useEncryption were not provided in connection message.';
-              throw new Error(this.prefix(errorMsg));
+              const error = new Error(
+                this.prefix('encryption is required but iv or jsonRequestKey or useEncryption were not provided in connection message.'),
+              );
+              reject(error);
+              throw error;
             }
-  
-            this.connection.useEncryption = true;
+
             this.#encryptionValues.iv = new Uint8Array([...data.iv]);
             this.#encryptionValues.algorithm = { iv: this.#encryptionValues.iv, name: AESCBC };
             this.#encryptionValues.requestKey = await crypto.subtle.importKey(
@@ -391,9 +426,9 @@ class PostMessenger<T extends Record<string, string>> {
           }
 
           /* If the page has multiple postMessenger instances to / from same origin there could be
-             a second connect message that overwrites this connection. Once the first connection
-             is confirmed we should stop listening for future connect messages: */
-          removeResponders();
+         a second connect message that overwrites this connection. Once the first connection
+         is confirmed we should stop listening for future connect messages: */
+          removeConnectionResponder();
 
           this.logger(`Accepted connection from ${this.connection.clientName}`, this.connection);
 
@@ -459,7 +494,7 @@ class PostMessenger<T extends Record<string, string>> {
     // This is the plaintext:
     const encoder = new TextEncoder();
     const encodedData = encoder.encode(JSON.stringify(data));
-  
+
     // Finally, encrypt the plaintext, and obtain the ciphertext.
     const encryptedAB = await crypto.subtle.encrypt(
       this.#encryptionValues.algorithm,
@@ -468,7 +503,7 @@ class PostMessenger<T extends Record<string, string>> {
       // The plaintext to encrypt.
       encodedData,
     );
-  
+
     const encryptedText = ab2str(encryptedAB);
     const base64Text = encodeBase64(encryptedText);
     return base64Text;
