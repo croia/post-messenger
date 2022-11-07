@@ -122,20 +122,16 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     return new Error(this.#prefix(msg));
   }
 
-  getListeners(): Listeners {
-    return this.#listeners;
-  }
-
-  addListener(messageName: string, fn: Listener): RemoveListener {
+  #addListener(messageName: string, fn: Listener): RemoveListener {
     if (this.#listeners[messageName]) {
       this.#listeners[messageName].push(fn);
     } else {
       this.#listeners[messageName] = [fn];
     }
-    return () => this.removeListener(messageName, fn);
+    return () => this.#removeListener(messageName, fn);
   }
 
-  removeListener(messageName: string, fn: Listener): void {
+  #removeListener(messageName: string, fn: Listener): void {
     if (this.#listeners[messageName]) {
       const i = this.#listeners[messageName].indexOf(fn);
       if (i > -1) {
@@ -170,9 +166,9 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     let data = messageData;
     let errorMessage = errorMessageStr || null;
     if (this.useEncryption(requestName, true)) {
-      data = await this.encrypt(messageData);
+      data = await this.#encrypt(messageData);
       if (errorMessage) {
-        errorMessage = await this.encrypt(errorMessage);
+        errorMessage = await this.#encrypt(errorMessage);
       }
     }
     this.#send({
@@ -190,7 +186,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     this.#logger(`sending request with name '${requestName}' to '${this.targetOrigin}':`, data);
     const result = new Promise((resolve, reject) => {
       let hasCompleted = false;
-      const removeResponseListener = this.addListener(requestName, async (responseMessage): Promise<void> => {
+      const removeResponseListener = this.#addListener(requestName, async (responseMessage): Promise<void> => {
         if (!isRequestMessage<R>(responseMessage)) {
           return;
         }
@@ -200,7 +196,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
           if (responseMessage.isError) {
             let errorMessage = responseMessage.errorMessage;
             if (this.useEncryption(requestName, true) && responseMessage.errorMessage) {
-              errorMessage = await this.decrypt(responseMessage.errorMessage);
+              errorMessage = await this.#decrypt(responseMessage.errorMessage);
             }
             reject(this.#buildError(
               `Responder for request name '${requestName}' to target '${this.targetOrigin}' ` +
@@ -215,7 +211,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
                 ));
                 return;
               }
-              responseMessageData = await this.decrypt<R>(responseMessage.data);
+              responseMessageData = await this.#decrypt<R>(responseMessage.data);
             }
             resolve(responseMessageData);
           }
@@ -238,7 +234,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   }
 
   /* validate requestName exists if optional requestNames are provided to constructor */
-  getRequestName(requestName: string): string {
+  #getRequestName(requestName: string): string {
     if (InternalRequestNames[requestName]) {
       return InternalRequestNames[requestName];
     }
@@ -261,7 +257,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
         `Connected client ${this.connection.clientName} does not have a matching request name for ${String(requestName)} so this request will fail.`,
       );
     }
-    return this.#request<R>(this.getRequestName(requestName), data, options);
+    return this.#request<R>(this.#getRequestName(requestName), data, options);
   }
 
   /* Accepts an object of event requestNames mapping to handlers that return promises.
@@ -270,8 +266,8 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   #bindResponders(responders: Responders<T> | Responders<InternalRequestNames>, validateRequest: ValidateRequest | null = null): RemoveAllResponders {
     const allRemoveFns: RemoveListener[] = [];
     Object.entries(responders).forEach(([messageName, handler]) => {
-      const requestName = this.getRequestName(messageName);
-      const removeListenerFn = this.addListener(requestName, async (message, event: WindowEventMap['message']): Promise<void> => {
+      const requestName = this.#getRequestName(messageName);
+      const removeListenerFn = this.#addListener(requestName, async (message, event: WindowEventMap['message']): Promise<void> => {
         if (!isRequestMessage(message) || !handler) {
           return;
         }
@@ -286,7 +282,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
             if (typeof data !== 'string') {
               throw this.#buildError('encryption is required but responder received a non string data response');
             }
-            data = await this.decrypt(data);
+            data = await this.#decrypt(data);
           }
           const response = await handler(data, event);
           this.#logger(`responding to request name '${requestName}' from target '${this.targetOrigin}':`, response);
@@ -319,8 +315,8 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     if (!targetWindow || !targetOrigin) {
       throw this.#buildError('targetWindow and targetOrigin are required for connect');
     }
-    this.setTarget(targetWindow, targetOrigin);
-    this.beginListening(origin => (origin === new URL(targetOrigin).origin));
+    this.#setTarget(targetWindow, targetOrigin);
+    this.#beginListening(origin => (origin === new URL(targetOrigin).origin));
 
     let iv: Uint8Array | null = null;
     let jsonRequestKey: JsonWebKey | null = null;
@@ -388,7 +384,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
       !fromClientName || fromClientName === data.clientName
     );
 
-    this.beginListening(messageOrigin => (origin ? messageOrigin === origin : true));
+    this.#beginListening(messageOrigin => (origin ? messageOrigin === origin : true));
 
     return new Promise((resolve, reject) => {
       const removeConnectionResponder = this.#bindResponders({
@@ -403,7 +399,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
             useEncryption: data.useEncryption,
           };
 
-          this.setTarget(event.source as Window, data.origin);
+          this.#setTarget(event.source as Window, data.origin);
 
           const requestNames = this.requestNames;
           /* check to make sure both sides agree on requestNames */
@@ -463,7 +459,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     });
   }
 
-  setTarget(targetWindow: Window, targetOrigin: string): void {
+  #setTarget(targetWindow: Window, targetOrigin: string): void {
     if (!targetWindow || !targetOrigin) {
       throw this.#buildError('targetWindow and targetWindow are required for setTarget');
     }
@@ -473,7 +469,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     this.targetOrigin = targetUrl.origin;
   }
 
-  beginListening(validateOrigin: ValidateOriginFn): void {
+  #beginListening(validateOrigin: ValidateOriginFn): void {
     this.#validateOrigin = validateOrigin;
     window.addEventListener('message', this.onReceiveMessage);
   }
@@ -482,7 +478,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
     window.removeEventListener('message', this.onReceiveMessage);
   }
 
-  async decrypt<R = unknown>(data: string): Promise<R> {
+  async #decrypt<R = unknown>(data: string): Promise<R> {
     if (!this.#encryptionValues.algorithm || !this.#encryptionValues.requestKey) {
       throw this.#buildError('encryptionValues must be set before calling decrpyt');
     }
@@ -505,7 +501,7 @@ class PostMessenger<T extends Record<string, string> | undefined = undefined> {
   }
 
   /* encryption code based examples https://bit.ly/3ex4DiQ and https://ibm.co/30ABCdZ */
-  async encrypt(data: unknown): Promise<string> {
+  async #encrypt(data: unknown): Promise<string> {
     if (!this.#encryptionValues.algorithm || !this.#encryptionValues.requestKey) {
       throw this.#buildError('encryptionValues must be set before calling encrypt');
     }

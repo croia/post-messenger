@@ -180,22 +180,6 @@ describe('PostMessenger', () => {
     });
   });
 
-  describe('addListener and removeListener', () => {
-    test('should add and remove listeners successfully', async () => {
-      const postMessenger = new PostMessenger({ clientName }, RequestNames);
-      const listener = () => { };
-      const removeListener = postMessenger.addListener(RequestNames.one, listener);
-      let listeners = postMessenger.getListeners();
-      expect(Object.keys(listeners)).toHaveLength(1);
-      expect(Object.values(listeners)[0]).toHaveLength(1);
-      expect(Object.values(listeners)[0][0]).toEqual(listener);
-      removeListener();
-      listeners = postMessenger.getListeners();
-      expect(Object.keys(listeners)).toHaveLength(1);
-      expect(Object.values(listeners)[0]).toHaveLength(0);
-    });
-  });
-
   describe('request', () => {
     let iframeWindow: Window;
     let postMessenger: PostMessenger;
