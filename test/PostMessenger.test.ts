@@ -151,49 +151,32 @@ describe('PostMessenger', () => {
     });
   });
 
-  describe('logger', () => {
-    test('should not log when enableLogging is false', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        enableLogging: false,
-      }, RequestNames);
-
+  describe('enableLogging constructor argument', () => {
+    test('should not log when false', async () => {
       const consoleLogMock = jest.spyOn(console, 'log');
       const consoleWarnMock = jest.spyOn(console, 'warn');
       const consoleErrorMock = jest.spyOn(console, 'error');
 
-      postMessenger.logger('sjkdfkjd');
+      new PostMessenger({
+        clientName,
+        useEncryption: false,
+      }, RequestNames);
+
       expect(consoleLogMock).not.toHaveBeenCalled();
       expect(consoleWarnMock).not.toHaveBeenCalled();
       expect(consoleErrorMock).not.toHaveBeenCalled();
     });
 
-    test('should log when enableLogging is true', async () => {
-      const postMessenger = new PostMessenger({
-        clientName,
-        enableLogging: true,
-      }, RequestNames);
-
+    test('should log when true', async () => {
       const consoleLogMock = jest.spyOn(console, 'log');
 
-      postMessenger.logger('should log when enableLogging is true');
-      expect(consoleLogMock).toHaveBeenCalled();
-    });
-  });
+      new PostMessenger({
+        clientName,
+        enableLogging: true,
+        useEncryption: false,
+      }, RequestNames);
 
-  describe('addListener and removeListener', () => {
-    test('should add and remove listeners successfully', async () => {
-      const postMessenger = new PostMessenger({ clientName }, RequestNames);
-      const listener = () => { };
-      const removeListener = postMessenger.addListener(RequestNames.one, listener);
-      let listeners = postMessenger.getListeners();
-      expect(Object.keys(listeners)).toHaveLength(1);
-      expect(Object.values(listeners)[0]).toHaveLength(1);
-      expect(Object.values(listeners)[0][0]).toEqual(listener);
-      removeListener();
-      listeners = postMessenger.getListeners();
-      expect(Object.keys(listeners)).toHaveLength(1);
-      expect(Object.values(listeners)[0]).toHaveLength(0);
+      expect(consoleLogMock).toHaveBeenCalled();
     });
   });
 
