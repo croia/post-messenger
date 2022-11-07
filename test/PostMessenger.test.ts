@@ -273,15 +273,36 @@ describe('PostMessenger', () => {
       }).rejects.toThrow(new RegExp('.*no connected client.*', 'gi'));
     });
 
-    describe('when requestNames is provided', () => {
-      test('should throw an error if messageKey does not exist on request names', async () => {
-        const pm = new PostMessenger({ clientName }, RequestNames);
+    test('should throw an error if messageKey does not exist on request names when requestNames are provided', async () => {
+      const pm = new PostMessenger({ clientName }, RequestNames);
 
-        expect(() => {
-          // @ts-expect-error: 'two' is not on requestNames so this should be a type error:
-          pm.request('two', {});
-        }).toThrow();
+      expect(() => {
+        // @ts-expect-error: 'two' is not on requestNames so this should be a type error:
+        pm.request('two', {});
+      }).toThrow(/.*requestNames were provided to constructor but unable to find requestName for two.*/);
+    });
+
+    test('should allow any request name by default if requestNames not provided', async () => {
+      const pm = new PostMessenger({ clientName });
+      windowRef = await connectWithMock(pm, iframeWindow, targetOrigin, defaultConnectionDetails);
+
+      postMessageSpy.mockImplementation(async (message) => {
+        await sleep(0); // move to bottom of stack since addListener from connectWithMock above is added async
+        windowRef.sendMessage(buildMessageEvent({
+          data: {
+            data: 'sdf',
+            errorMessage: null,
+            isError: false,
+            requestId: message.requestId,
+            requestName: 'two',
+          },
+          origin: targetOrigin,
+        }));
       });
+
+      /* note there is no type error here when requestNames is not provided.
+         see test above for opposite case which verifies that a type error is thrown */
+      await expect(await pm.request('two', {})).toEqual(JSON.parse(textDecoderResponse));
     });
   });
 
@@ -321,17 +342,15 @@ describe('PostMessenger', () => {
     window.TextEncoder = TextEncoder;
     window.TextDecoder = TextDecoder;
 
-    describe('when requestNames are provided', () => {
-      test('should throw an error immediately if connected client does not have matching request name', async () => {
-        await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
-          clientName: 'iframe-client',
-          requestNames: {},
-          useEncryption: true,
-        });
-        await expect(async () => {
-          await postMessenger.request(RequestNameKeys.one, {});
-        }).rejects.toThrow(/.*does not have a matching request name*/gi);
+    test('should throw an error immediately if connected client does not have matching request name when requestNames are provided', async () => {
+      await connectWithMock(postMessenger, iframeWindow, targetOrigin, {
+        clientName: 'iframe-client',
+        requestNames: {},
+        useEncryption: true,
       });
+      await expect(async () => {
+        await postMessenger.request(RequestNameKeys.one, {});
+      }).rejects.toThrow(/.*does not have a matching request name*/gi);
     });
 
     test('should connect successfully', async () => {
